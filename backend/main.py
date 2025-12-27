@@ -1,8 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from api.models import DetectRequest, DetectResponse, ConvertRequest, ConvertResponse
+from core.language_detector import LanguageDetector
+from core.conversion_engine import ConversionEngine
 
-app = FastAPI()
+# Initialize FastAPI app
+app = FastAPI(
+    title="Code Converter API",
+    description="Convert code between Python, JavaScript, and Java",
+    version="2.0"
+)
 
 # Allow frontend to call backend
 app.add_middleware(
@@ -12,64 +19,74 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize core modules
+detector = LanguageDetector()
+engine = ConversionEngine()
+
+
 @app.get("/")
 def root():
-    return {"status": "Backend running"}
-
-
-# Language Detection Logic
-def detect_language(code: str):
-    code = code.lower()
-
-    if "def " in code and ":" in code:
-        return "python"
-    if "console.log" in code or "let " in code or "=>" in code:
-        return "javascript"
-    if "public static void main" in code or "system.out.println" in code:
-        return "java"
-
-    return "unknown"
-
-
-# Request Models
-class DetectRequest(BaseModel):
-    code: str
-
-
-class ConvertRequest(BaseModel):
-    code: str
-    source_language: str
-    target_language: str
-
-
-# Language Detection API
-@app.post("/detect-language")
-def detect(req: DetectRequest):
-    language = detect_language(req.code)
+    """Health check endpoint."""
     return {
-        "detected_language": language
+        "status": "Backend running",
+        "version": "2.0",
+        "supported_pairs": engine.get_supported_pairs()
     }
 
 
-# Code Conversion Logic
-def convert_code(code: str, source: str, target: str):
-    if source == "python" and target == "javascript":
-        return code.replace("print(", "console.log(")
+@app.post("/detect-language", response_model=DetectResponse)
+def detect_language(req: DetectRequest):
+    """
+    Detect source code language with confidence score.
 
-    if source == "javascript" and target == "python":
-        return code.replace("console.log(", "print(")
+    Args:
+        req: DetectRequest with code
 
-    return "// Conversion not supported yet"
+    Returns:
+        DetectResponse with detected_language, confidence, reason, and alternatives
+    """
+    try:
+        if not req.code.strip():
+            raise ValueError("Code cannot be empty")
+
+        result = detector.detect(req.code)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Detection error: {str(e)}")
 
 
-# Code Conversion API
-@app.post("/convert")
-def convert(req: ConvertRequest):
-    result = convert_code(
-        req.code,
-        req.source_language,
-        req.target_language
-    )
-    return {
-        "converted_code": result
-    }
+@app.post("/convert", response_model=ConvertResponse)
+def convert_code(req: ConvertRequest):
+    """
+    Convert code between supported languages.
+
+    Args:
+        req: ConvertRequest with code, source_language, target_language
+
+    Returns:
+        ConvertResponse with converted_code, confidence, warnings, and metadata
+    """
+    try:
+        if not req.code.strip():
+            raise ValueError("Code cannot be empty")
+
+        if not req.source_language:
+            raise ValueError("Source language must be specified")
+
+        if not req.target_language:
+            raise ValueError("Target language must be specified")
+
+        result = engine.convert(
+            code=req.code,
+            source_language=req.source_language,
+            target_language=req.target_language,
+            strict_mode=req.strict_mode
+        )
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Conversion error: {str(e)}")

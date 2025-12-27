@@ -1,15 +1,65 @@
 INFO:     Will watch for changes in these directories: ['/home/user/code-convertor/backend']
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [2689] using StatReload
-INFO:     Started server process [2692]
+INFO:     Started reloader process [6754] using StatReload
+/home/user/code-convertor/backend/api/models.py:26: UserWarning: Field name "construct" in "UnsupportedConstruct" shadows an attribute in parent "BaseModel"
+  class UnsupportedConstruct(BaseModel):
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "/usr/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/local/lib/python3.11/dist-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/usr/local/lib/python3.11/dist-packages/uvicorn/server.py", line 67, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/uvicorn/server.py", line 71, in serve
+    await self._serve(sockets)
+  File "/usr/local/lib/python3.11/dist-packages/uvicorn/server.py", line 78, in _serve
+    config.load()
+  File "/usr/local/lib/python3.11/dist-packages/uvicorn/config.py", line 439, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/home/user/code-convertor/backend/main.py", line 5, in <module>
+    from core.conversion_engine import ConversionEngine
+  File "/home/user/code-convertor/backend/core/conversion_engine.py", line 4, in <module>
+    from converters.python_to_javascript import PythonToJavaScriptConverter
+  File "/home/user/code-convertor/backend/converters/python_to_javascript.py", line 58
+    args = re.sub(r'f["\']([^"\']*)["\']', lambda m: f"`{re.sub(r'\{(\w+)\}', r'${\1}', m.group(1))}`", args)
+                                                                                                      ^
+SyntaxError: f-string expression part cannot include a backslash
+WARNING:  StatReload detected changes in 'converters/python_to_javascript.py'. Reloading...
+/home/user/code-convertor/backend/api/models.py:26: UserWarning: Field name "construct" in "UnsupportedConstruct" shadows an attribute in parent "BaseModel"
+  class UnsupportedConstruct(BaseModel):
+INFO:     Started server process [7581]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     127.0.0.1:55938 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:47292 - "POST /detect-language HTTP/1.1" 200 OK
-INFO:     127.0.0.1:30966 - "POST /convert HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65524 - "POST /detect-language HTTP/1.1" 200 OK
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [2692]
-INFO:     Stopping reloader process [2689]
+INFO:     127.0.0.1:26838 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33392 - "POST /convert HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47081 - "POST /convert HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45241 - "POST /detect-language HTTP/1.1" 200 OK
+INFO:     127.0.0.1:22119 - "POST /convert HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43860 - "POST /convert HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32335 - "POST /convert HTTP/1.1" 200 OK

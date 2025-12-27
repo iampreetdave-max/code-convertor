@@ -77,6 +77,15 @@
           </select>
           <textarea id="outputCode" placeholder="Converted code will appear here" readonly
             class="mt-4 h-64 w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"></textarea>
+
+          <!-- Conversion Metadata -->
+          <div id="conversionMetadata" class="hidden mt-3 p-3 bg-gray-900 border border-gray-600 rounded text-xs">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-gray-400">Conversion Confidence</span>
+              <span id="confidenceScore" class="text-green-400 font-semibold">-</span>
+            </div>
+            <div id="conversionWarnings" class="text-yellow-400"></div>
+          </div>
         </div>
       </div>
 
@@ -141,6 +150,38 @@
 
         const data = await response.json();
         document.getElementById("outputCode").value = data.converted_code;
+
+        // Display conversion metadata
+        const metadataDiv = document.getElementById("conversionMetadata");
+        const confidenceSpan = document.getElementById("confidenceScore");
+        const warningsDiv = document.getElementById("conversionWarnings");
+
+        // Show/hide metadata based on confidence
+        if (data.conversion_confidence !== undefined) {
+          metadataDiv.classList.remove("hidden");
+          const confidencePercent = (data.conversion_confidence * 100).toFixed(1);
+          confidenceSpan.textContent = confidencePercent + "%";
+
+          // Color code confidence
+          if (data.conversion_confidence >= 0.8) {
+            confidenceSpan.className = "text-green-400 font-semibold";
+          } else if (data.conversion_confidence >= 0.6) {
+            confidenceSpan.className = "text-yellow-400 font-semibold";
+          } else {
+            confidenceSpan.className = "text-red-400 font-semibold";
+          }
+
+          // Display warnings
+          if (data.warnings && data.warnings.length > 0) {
+            warningsDiv.innerHTML = "<p class='font-semibold mb-1'>⚠️ Warnings:</p>" +
+              data.warnings.slice(0, 3).map(w => `<p>• ${w}</p>`).join("");
+            if (data.warnings.length > 3) {
+              warningsDiv.innerHTML += `<p class='text-gray-400 mt-1'>... and ${data.warnings.length - 3} more</p>`;
+            }
+          } else {
+            warningsDiv.innerHTML = "<p class='text-green-400'>✓ No warnings</p>";
+          }
+        }
       } catch (error) {
         console.error("Error converting code:", error);
         alert("Error converting code. Make sure backend is running on http://127.0.0.1:8000");
