@@ -256,6 +256,11 @@
             </div>
             <div class="flex items-center gap-2">
               <span id="sourceLineCount" class="text-xs text-gray-500">0 lines</span>
+              <button onclick="formatSourceCode()" class="btn-icon p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs" title="Format code">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/>
+                </svg>
+              </button>
               <button onclick="clearSource()" class="btn-icon p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs" title="Clear source">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -325,6 +330,11 @@
               <button onclick="copyAsMarkdown()" class="btn-icon p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs" title="Copy as Markdown">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                </svg>
+              </button>
+              <button onclick="formatOutputCode()" class="btn-icon p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs" title="Format code">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/>
                 </svg>
               </button>
             </div>
@@ -1262,7 +1272,80 @@ ${outputCode}
       document.getElementById('fromLanguage').value = '';
       document.getElementById('sourceLanguageBadge').classList.add('hidden');
       updateSourceLineCount();
+      updateSourceHighlight();
       showToast('Source cleared', 'info');
+    }
+
+    // Code formatting functions
+    function formatSourceCode() {
+      const textarea = document.getElementById('sourceCode');
+      const lang = document.getElementById('fromLanguage').value || 'python';
+      textarea.value = formatCode(textarea.value, lang);
+      updateSourceLineCount();
+      updateSourceHighlight();
+      showToast('Code formatted!');
+    }
+
+    function formatOutputCode() {
+      const textarea = document.getElementById('outputCode');
+      const lang = document.getElementById('toLanguage').value || 'javascript';
+      textarea.value = formatCode(textarea.value, lang);
+      updateOutputLineCount();
+      updateOutputHighlight();
+      showToast('Code formatted!');
+    }
+
+    function formatCode(code, language) {
+      if (!code.trim()) return code;
+
+      const lines = code.split('\n');
+      const formattedLines = [];
+      let indentLevel = 0;
+      const indentChar = language === 'python' ? '    ' : '  '; // 4 spaces for Python, 2 for JS
+
+      // Patterns for increasing/decreasing indent
+      const increaseIndent = language === 'python'
+        ? /:\s*$/  // Python: ends with colon
+        : /\{\s*$/; // JS: ends with {
+
+      const decreaseIndent = language === 'python'
+        ? /^\s*(elif|else|except|finally|return|pass|break|continue)\b/
+        : /^\s*\}/; // JS: starts with }
+
+      const decreaseBeforeWrite = language === 'python'
+        ? /^\s*(elif|else|except|finally)\b/
+        : /^\s*\}/;
+
+      for (let line of lines) {
+        // Trim the line
+        const trimmed = line.trim();
+
+        // Skip empty lines but preserve them
+        if (!trimmed) {
+          formattedLines.push('');
+          continue;
+        }
+
+        // Check if we need to decrease indent before writing
+        if (decreaseBeforeWrite.test(trimmed) && indentLevel > 0) {
+          indentLevel--;
+        }
+
+        // Add proper indentation
+        formattedLines.push(indentChar.repeat(indentLevel) + trimmed);
+
+        // Check if we need to increase indent for next line
+        if (increaseIndent.test(trimmed)) {
+          indentLevel++;
+        }
+
+        // For JS, also decrease after closing brace
+        if (language !== 'python' && /^\s*\}/.test(trimmed) && !/\{\s*$/.test(trimmed)) {
+          // Already handled above
+        }
+      }
+
+      return formattedLines.join('\n');
     }
 
     // History management
