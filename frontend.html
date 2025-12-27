@@ -56,32 +56,32 @@
         <!-- Source -->
         <div>
           <label class="block text-sm mb-2 text-white">From Language</label>
-          <select class="w-full p-2 bg-gray-900 border border-gray-700 rounded text-white">
-            <option>Select source language</option>
+          <select id="fromLanguage" class="w-full p-2 bg-gray-900 border border-gray-700 rounded text-white">
+            <option value="">Select source language</option>
             <option value="python">Python</option>
             <option value="javascript">JavaScript</option>
             <option value="java">Java</option>
           </select>
-          <textarea placeholder="Paste your code here..."
+          <textarea id="sourceCode" placeholder="Paste your code here..." onblur="detectLanguage()"
             class="mt-4 h-64 w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"></textarea>
         </div>
 
         <!-- Target -->
         <div>
           <label class="block text-sm mb-2 text-white">To Language</label>
-          <select class="w-full p-2 bg-gray-900 border border-gray-700 rounded text-white">
-            <option>Select target language</option>
+          <select id="toLanguage" class="w-full p-2 bg-gray-900 border border-gray-700 rounded text-white">
+            <option value="">Select target language</option>
             <option value="python">Python</option>
             <option value="javascript">JavaScript</option>
             <option value="java">Java</option>
           </select>
-          <textarea placeholder="Converted code will appear here" readonly
+          <textarea id="outputCode" placeholder="Converted code will appear here" readonly
             class="mt-4 h-64 w-full bg-gray-900 border border-gray-700 rounded p-2 text-white"></textarea>
         </div>
       </div>
 
       <div class="flex justify-center mt-6">
-        <button class="bg-gray-700 hover:bg-gray-600 px-6 py-2 rounded-lg text-white">
+        <button onclick="convertCode()" class="bg-gray-700 hover:bg-gray-600 px-6 py-2 rounded-lg text-white">
           → Convert Code
         </button>
       </div>
@@ -92,5 +92,60 @@
       Powered by advanced AI • Supports 30+ programming languages
     </p>
   </main>
+
+  <script>
+    async function detectLanguage() {
+      const code = document.getElementById("sourceCode").value;
+
+      if (!code.trim()) return;
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/detect-language", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ code })
+        });
+
+        const data = await response.json();
+
+        if (data.detected_language !== "unknown") {
+          document.getElementById("fromLanguage").value = data.detected_language;
+        }
+      } catch (error) {
+        console.error("Error detecting language:", error);
+      }
+    }
+
+    async function convertCode() {
+      const code = document.getElementById("sourceCode").value;
+      const source = document.getElementById("fromLanguage").value;
+      const target = document.getElementById("toLanguage").value;
+
+      if (!code.trim() || !source || !target) {
+        alert("Please fill in all fields");
+        return;
+      }
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/convert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            source_language: source,
+            target_language: target
+          })
+        });
+
+        const data = await response.json();
+        document.getElementById("outputCode").value = data.converted_code;
+      } catch (error) {
+        console.error("Error converting code:", error);
+        alert("Error converting code. Make sure backend is running on http://127.0.0.1:8000");
+      }
+    }
+  </script>
 </body>
 </html>
