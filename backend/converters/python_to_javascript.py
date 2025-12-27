@@ -143,6 +143,28 @@ class VariableDeclaration(Rule):
         value = re.sub(r"\bFalse\b", "false", value)
         # None
         value = re.sub(r"\bNone\b", "null", value)
+
+        # f-strings: f"text {var}" → `text ${var}`
+        def convert_fstring(match):
+            content = match.group(1)
+            # Replace {var} with ${var}, handle complex expressions
+            converted = re.sub(r'\{([^}]+)\}', r'${\1}', content)
+            return "`" + converted + "`"
+        value = re.sub(r'f["\']([^"\']*)["\']', convert_fstring, value)
+
+        # len(x) → x.length
+        def convert_len(match):
+            arg = match.group(1)
+            return f"{arg}.length"
+        value = re.sub(r'\blen\s*\(\s*([^)]+)\s*\)', convert_len, value)
+
+        # Lambda: lambda x: expr → (x) => expr
+        def convert_lambda(match):
+            params = match.group(1).strip()
+            body = match.group(2).strip()
+            return f"({params}) => {body}"
+        value = re.sub(r'\blambda\s+([^:]+):\s*(.+)$', convert_lambda, value)
+
         return value
 
 
@@ -187,6 +209,8 @@ class IfCondition(Rule):
         condition = condition.replace("None", "null")
         condition = condition.replace("True", "true")
         condition = condition.replace("False", "false")
+        # len(x) → x.length
+        condition = re.sub(r'\blen\s*\(\s*([^)]+)\s*\)', r'\1.length', condition)
         return condition
 
     def creates_block(self) -> bool:
@@ -229,6 +253,8 @@ class ElifCondition(Rule):
         condition = condition.replace("None", "null")
         condition = condition.replace("True", "true")
         condition = condition.replace("False", "false")
+        # len(x) → x.length
+        condition = re.sub(r'\blen\s*\(\s*([^)]+)\s*\)', r'\1.length', condition)
         return condition
 
     def creates_block(self) -> bool:
@@ -354,6 +380,8 @@ class WhileLoop(Rule):
         condition = condition.replace("None", "null")
         condition = condition.replace("True", "true")
         condition = condition.replace("False", "false")
+        # len(x) → x.length
+        condition = re.sub(r'\blen\s*\(\s*([^)]+)\s*\)', r'\1.length', condition)
         return condition
 
     def creates_block(self) -> bool:
