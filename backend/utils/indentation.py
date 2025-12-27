@@ -36,16 +36,27 @@ class IndentationTracker:
     def get_indent_level(self, line: str) -> int:
         """
         Determine indentation level of a line.
-        Python: Count spaces/tabs at start
+        Python: Count spaces/tabs at start (4 spaces per level)
+        JavaScript: Count spaces/tabs at start (2 or 4 spaces per level)
         """
         if not line.strip():
             return self.current_indent
 
+        leading_spaces = len(line) - len(line.lstrip())
+
         if self.source_lang == "python":
-            # Count leading spaces (assuming 4-space indentation)
-            leading_spaces = len(line) - len(line.lstrip())
-            # Calculate indent level (divide by 4 for Python standard)
+            # Python: 4 spaces per indentation level
             return leading_spaces // 4 if leading_spaces >= 4 else (1 if leading_spaces > 0 else 0)
+        elif self.source_lang == "javascript":
+            # JavaScript: can use 2 or 4 spaces per level
+            # Prefer 4-space if divisible by 4, otherwise use 2-space
+            if leading_spaces % 4 == 0:
+                return leading_spaces // 4
+            elif leading_spaces % 2 == 0:
+                return leading_spaces // 2
+            else:
+                return 1 if leading_spaces > 0 else 0
+
         return self.current_indent
 
     def record_line_indent(self, line_num: int, indent_level: int):
