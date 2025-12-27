@@ -2,6 +2,7 @@ from typing import Dict
 from api.models import ConvertResponse
 from core.language_detector import LanguageDetector
 from converters.python_to_javascript import PythonToJavaScriptConverter
+from converters.javascript_to_python import JavaScriptToPythonConverter
 
 
 class ConversionEngine:
@@ -12,8 +13,8 @@ class ConversionEngine:
         self.detector = LanguageDetector()
         self.converters: Dict[tuple, type] = {
             ("python", "javascript"): PythonToJavaScriptConverter,
+            ("javascript", "python"): JavaScriptToPythonConverter,
             # Future pairs can be added here
-            # ("javascript", "python"): JavaScriptToPythonConverter,
             # ("python", "java"): PythonToJavaConverter,
             # etc.
         }
