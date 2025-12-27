@@ -152,9 +152,33 @@ class VariableDeclaration(Rule):
 
     def _convert_value(self, value: str) -> str:
         """Convert JavaScript values to Python."""
-        value = value.replace("true", "True")
-        value = value.replace("false", "False")
-        value = value.replace("null", "None")
+        value = re.sub(r"\btrue\b", "True", value)
+        value = re.sub(r"\bfalse\b", "False", value)
+        value = re.sub(r"\bnull\b", "None", value)
+        value = re.sub(r"\bundefined\b", "None", value)
+
+        # Template literals: `text ${var}` → f"text {var}"
+        def convert_template(match):
+            content = match.group(1)
+            # Replace ${var} with {var}
+            converted = re.sub(r'\$\{([^}]+)\}', r'{\1}', content)
+            return 'f"' + converted + '"'
+        value = re.sub(r'`([^`]*)`', convert_template, value)
+
+        # .length → len()
+        def convert_length(match):
+            obj = match.group(1)
+            return f"len({obj})"
+        value = re.sub(r'(\w+)\.length\b', convert_length, value)
+
+        # Ternary: a ? b : c → b if a else c
+        def convert_ternary(match):
+            condition = match.group(1).strip()
+            true_val = match.group(2).strip()
+            false_val = match.group(3).strip()
+            return f"{true_val} if {condition} else {false_val}"
+        value = re.sub(r'([^?]+)\s*\?\s*([^:]+)\s*:\s*(.+)$', convert_ternary, value)
+
         return value
 
 
@@ -192,9 +216,12 @@ class IfStatement(Rule):
         condition = re.sub(r"!\s*", "not ", condition)
         condition = condition.replace("===", "==")
         condition = condition.replace("!==", "!=")
-        condition = condition.replace("null", "None")
-        condition = condition.replace("true", "True")
-        condition = condition.replace("false", "False")
+        condition = re.sub(r"\bnull\b", "None", condition)
+        condition = re.sub(r"\bundefined\b", "None", condition)
+        condition = re.sub(r"\btrue\b", "True", condition)
+        condition = re.sub(r"\bfalse\b", "False", condition)
+        # .length → len()
+        condition = re.sub(r'(\w+)\.length\b', r'len(\1)', condition)
         return condition
 
     def creates_block(self) -> bool:
@@ -235,9 +262,12 @@ class ElseIfStatement(Rule):
         condition = re.sub(r"!\s*", "not ", condition)
         condition = condition.replace("===", "==")
         condition = condition.replace("!==", "!=")
-        condition = condition.replace("null", "None")
-        condition = condition.replace("true", "True")
-        condition = condition.replace("false", "False")
+        condition = re.sub(r"\bnull\b", "None", condition)
+        condition = re.sub(r"\bundefined\b", "None", condition)
+        condition = re.sub(r"\btrue\b", "True", condition)
+        condition = re.sub(r"\bfalse\b", "False", condition)
+        # .length → len()
+        condition = re.sub(r'(\w+)\.length\b', r'len(\1)', condition)
         return condition
 
     def creates_block(self) -> bool:
@@ -334,9 +364,12 @@ class WhileLoop(Rule):
         condition = re.sub(r"!\s*", "not ", condition)
         condition = condition.replace("===", "==")
         condition = condition.replace("!==", "!=")
-        condition = condition.replace("null", "None")
-        condition = condition.replace("true", "True")
-        condition = condition.replace("false", "False")
+        condition = re.sub(r"\bnull\b", "None", condition)
+        condition = re.sub(r"\bundefined\b", "None", condition)
+        condition = re.sub(r"\btrue\b", "True", condition)
+        condition = re.sub(r"\bfalse\b", "False", condition)
+        # .length → len()
+        condition = re.sub(r'(\w+)\.length\b', r'len(\1)', condition)
         return condition
 
     def creates_block(self) -> bool:
