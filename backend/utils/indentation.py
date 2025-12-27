@@ -46,7 +46,13 @@ class IndentationTracker:
 
         if self.source_lang == "python":
             # Python: 4 spaces per indentation level
-            return leading_spaces // 4 if leading_spaces >= 4 else (1 if leading_spaces > 0 else 0)
+            # Malformed indentation (1-3 spaces) is treated as level 0
+            if leading_spaces == 0:
+                return 0
+            elif leading_spaces < 4:
+                return 0  # Malformed indentation - treat as no indent
+            else:
+                return leading_spaces // 4
         elif self.source_lang == "javascript":
             # JavaScript: can use 2 or 4 spaces per level
             # Prefer 4-space if divisible by 4, otherwise use 2-space

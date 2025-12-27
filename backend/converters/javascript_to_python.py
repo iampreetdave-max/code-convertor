@@ -117,12 +117,14 @@ class VariableDeclaration(Rule):
             # Check if value is an arrow function: check for =>
             if "=>" in value:
                 # Convert arrow function in value
-                arrow_match = re.search(r"(\w+)\s*=>\s*(.+)$", value)
+                # Matches: x => ..., (x) => ..., (x, y) => ...
+                arrow_match = re.search(r"(?:\(([^)]*)\)|(\w+))\s*=>\s*(.+)$", value)
                 if arrow_match:
-                    params = arrow_match.group(1)
-                    body = arrow_match.group(2).strip()
-                    # Only convert simple expressions
-                    if "{" not in body and ";" not in body:
+                    # Group 1: params in parentheses, Group 2: single param without parens
+                    params = arrow_match.group(1) if arrow_match.group(1) else arrow_match.group(2)
+                    body = arrow_match.group(3).strip()
+                    # Only convert simple expressions (single parameter and simple body)
+                    if "{" not in body and ";" not in body and "," not in params:
                         value = f"lambda {params}: {body}"
                         warnings.add_warning(
                             "Arrow functions converted to lambda. "

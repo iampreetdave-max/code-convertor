@@ -298,19 +298,17 @@ class BaseConverter(ABC):
         Returns:
             Converted line
         """
-        # Boolean values
-        line = line.replace(" True", " true")
-        line = line.replace(" False", " false")
-        line = line.replace("(True", "(true")
-        line = line.replace("(False", "(false")
+        # Boolean values - use word boundaries to handle all contexts
+        line = re.sub(r"\bTrue\b", "true", line)
+        line = re.sub(r"\bFalse\b", "false", line)
 
         # Logical operators
         line = re.sub(r"\band\b", "&&", line)
         line = re.sub(r"\bor\b", "||", line)
         line = re.sub(r"\bnot\b\s+", "!", line)
 
-        # None to null
-        line = line.replace("None", "null")
+        # None to null - use word boundary to avoid corrupting identifiers
+        line = re.sub(r"\bNone\b", "null", line)
 
         # Equality operators
         line = line.replace("==", "===")
