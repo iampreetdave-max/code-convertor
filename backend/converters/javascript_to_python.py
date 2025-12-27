@@ -2,6 +2,7 @@ import re
 from typing import Dict, List, Optional
 from converters.base_converter import BaseConverter, ConversionLevel
 from utils.indentation import IndentationTracker, ParsedLine
+from converters.method_converter import get_method_converter
 
 
 class Rule:
@@ -96,6 +97,7 @@ class VariableDeclaration(Rule):
 
     def __init__(self):
         super().__init__("variable", ConversionLevel.LEVEL_1)
+        self.method_converter = get_method_converter()
 
     def matches(self, line: str) -> bool:
         return re.search(r"^\s*(let|const|var)\s+\w+\s*=\s*", line) is not None
@@ -131,8 +133,13 @@ class VariableDeclaration(Rule):
                             "Python lambdas are limited to single expressions; complex functions need manual conversion."
                         )
             else:
-                # Convert regular value syntax
-                value = self._convert_value(value)
+                # Convert method calls in the value
+                converted_value = self.method_converter.convert_javascript_to_python(value)
+                if converted_value:
+                    value = converted_value.rstrip()
+                else:
+                    # Convert regular value syntax
+                    value = self._convert_value(value)
 
             converted = f"{indent}{var_name} = {value}"
             return {
@@ -507,6 +514,36 @@ class ArrowFunction(Rule):
         return {"success": False}
 
 
+class MethodCall(Rule):
+    """Converts JavaScript method calls to Python."""
+
+    def __init__(self):
+        super().__init__("method_call", ConversionLevel.LEVEL_1)
+        self.method_converter = get_method_converter()
+
+    def matches(self, line: str) -> bool:
+        """Check if line contains method calls."""
+        # Simple heuristic: contains dot followed by identifier and parenthesis
+        return re.search(r"\.\w+\s*\(", line) is not None
+
+    def convert(self, parsed_line: ParsedLine, tracker: IndentationTracker, warnings) -> Dict:
+        line = parsed_line.original
+        indent = parsed_line.get_target_indent("python")
+
+        # Try to convert method calls
+        converted = self.method_converter.convert_javascript_to_python(line)
+        if converted:
+            # Preserve indentation
+            result_line = indent + converted.lstrip()
+            return {
+                "success": True,
+                "converted_line": result_line,
+                "level": self.level
+            }
+
+        return {"success": False}
+
+
 class JavaScriptToPythonConverter(BaseConverter):
     """Converts JavaScript code to Python."""
 
@@ -528,6 +565,7 @@ class JavaScriptToPythonConverter(BaseConverter):
             "try": [TryBlock()],
             "except": [CatchBlock()],
             "arrow_function": [ArrowFunction()],
+            "method_call": [MethodCall()],
         }
 
     def _convert_common_patterns(self, line: str) -> str:

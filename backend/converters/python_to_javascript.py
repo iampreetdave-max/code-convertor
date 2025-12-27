@@ -2,6 +2,7 @@ import re
 from typing import Dict, List, Optional
 from converters.base_converter import BaseConverter, ConversionLevel
 from utils.indentation import IndentationTracker, ParsedLine
+from converters.method_converter import get_method_converter
 
 
 class Rule:
@@ -29,6 +30,7 @@ class PrintStatement(Rule):
 
     def __init__(self):
         super().__init__("print_statement", ConversionLevel.LEVEL_1)
+        self.method_converter = get_method_converter()
 
     def matches(self, line: str) -> bool:
         return re.search(r"\bprint\s*\(", line) is not None
@@ -44,6 +46,11 @@ class PrintStatement(Rule):
             start = match.end() - 1
             args = self._extract_balanced_parens(line, start)
             if args is not None:
+                # Convert method calls in arguments first
+                converted_args = self.method_converter.convert_python_to_javascript(args)
+                if converted_args:
+                    args = converted_args
+
                 # Convert argument syntax
                 args = self._convert_print_args(args)
                 converted = f"{indent}console.log({args});"
@@ -88,6 +95,7 @@ class VariableDeclaration(Rule):
 
     def __init__(self):
         super().__init__("variable", ConversionLevel.LEVEL_1)
+        self.method_converter = get_method_converter()
 
     def matches(self, line: str) -> bool:
         return re.search(r"^\s*\w+\s*=\s*", line) is not None and "==" not in line
@@ -104,6 +112,11 @@ class VariableDeclaration(Rule):
             # Remove trailing semicolon if present
             if value.endswith(";"):
                 value = value[:-1].strip()
+
+            # Convert method calls in the value
+            converted_value = self.method_converter.convert_python_to_javascript(value)
+            if converted_value:
+                value = converted_value.rstrip()
 
             # Convert Python syntax to JavaScript
             value = self._convert_python_value(value)
@@ -138,6 +151,7 @@ class IfCondition(Rule):
 
     def __init__(self):
         super().__init__("condition_if", ConversionLevel.LEVEL_2)
+        self.method_converter = get_method_converter()
 
     def matches(self, line: str) -> bool:
         return re.search(r"^\s*if\s+", line) is not None
@@ -149,6 +163,10 @@ class IfCondition(Rule):
         match = re.search(r"^\s*if\s+(.+):\s*$", line)
         if match:
             condition = match.group(1)
+            # Convert method calls in condition first
+            converted_condition = self.method_converter.convert_python_to_javascript(condition)
+            if converted_condition:
+                condition = converted_condition
             condition = self._convert_condition(condition)
             converted = f"{indent}if ({condition}) {{"
             tracker.enter_block()
@@ -520,6 +538,36 @@ class ListComprehension(Rule):
         return {"success": False}
 
 
+class MethodCall(Rule):
+    """Converts Python method calls to JavaScript."""
+
+    def __init__(self):
+        super().__init__("method_call", ConversionLevel.LEVEL_1)
+        self.method_converter = get_method_converter()
+
+    def matches(self, line: str) -> bool:
+        """Check if line contains method calls."""
+        # Simple heuristic: contains dot followed by identifier and parenthesis
+        return re.search(r"\.\w+\s*\(", line) is not None
+
+    def convert(self, parsed_line: ParsedLine, tracker: IndentationTracker, warnings) -> Dict:
+        line = parsed_line.original
+        indent = parsed_line.get_target_indent("javascript")
+
+        # Try to convert method calls
+        converted = self.method_converter.convert_python_to_javascript(line)
+        if converted:
+            # Preserve indentation
+            result_line = indent + converted.lstrip()
+            return {
+                "success": True,
+                "converted_line": result_line,
+                "level": self.level
+            }
+
+        return {"success": False}
+
+
 class PythonToJavaScriptConverter(BaseConverter):
     """Converts Python code to JavaScript."""
 
@@ -540,4 +588,5 @@ class PythonToJavaScriptConverter(BaseConverter):
             "try": [TryExcept()],
             "except": [ExceptClause()],
             "list_comp": [ListComprehension()],
+            "method_call": [MethodCall()],
         }
