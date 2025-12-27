@@ -14,10 +14,11 @@
       background-color: rgba(139, 92, 246, 0.1);
     }
     .code-textarea {
-      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-      font-size: 14px;
-      line-height: 1.5;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.6;
       resize: none;
+      tab-size: 2;
     }
     .btn-icon {
       transition: all 0.2s ease;
@@ -42,6 +43,28 @@
       from { transform: translateX(100%); opacity: 0; }
       to { transform: translateX(0); opacity: 1; }
     }
+    .progress-bar {
+      transition: width 0.5s ease-in-out;
+    }
+    .collapsible-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+    .collapsible-content.expanded {
+      max-height: 500px;
+    }
+    .language-badge {
+      font-size: 10px;
+      letter-spacing: 0.5px;
+    }
+    .confidence-ring {
+      transition: stroke-dashoffset 0.5s ease-in-out;
+    }
+    .warning-state {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    }
   </style>
 </head>
 <body class="min-h-screen bg-[#0f172a] text-white flex flex-col">
@@ -50,28 +73,37 @@
   <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
 
   <!-- Header -->
-  <header class="flex justify-between items-center px-6 py-4 border-b border-gray-700">
-    <div class="flex items-center space-x-2">
+  <header class="flex justify-between items-center px-6 py-3 border-b border-gray-700 bg-gray-900/50">
+    <div class="flex items-center space-x-3">
       <div class="bg-gradient-to-br from-purple-600 to-blue-500 p-2 rounded-lg">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
         </svg>
       </div>
       <div>
         <h1 class="text-lg font-semibold text-white">CodeTransform</h1>
-        <p class="text-xs text-gray-400">Universal Code Converter</p>
+        <p class="text-xs text-gray-400">Professional Code Converter</p>
       </div>
     </div>
 
     <div class="flex items-center space-x-4">
+      <!-- Stats Mini -->
+      <div class="hidden md:flex items-center gap-4 text-xs">
+        <div class="flex items-center gap-1.5">
+          <span class="text-gray-400">Conversions:</span>
+          <span id="conversionCount" class="font-semibold text-purple-400">0</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-gray-400">Success:</span>
+          <span id="successRate" class="font-semibold text-green-400">100%</span>
+        </div>
+      </div>
       <button onclick="toggleHistory()" class="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
         History
       </button>
-      <p class="text-sm text-gray-300">Welcome, Preet</p>
-      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center font-bold">P</div>
     </div>
   </header>
 
@@ -91,40 +123,28 @@
     </div>
   </div>
 
-  <!-- Main Section -->
-  <main class="flex-1 flex flex-col items-center justify-start p-8">
-    <h2 class="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">Universal Code Converter</h2>
-    <p class="text-gray-400 text-center max-w-xl mb-8">
-      Transform your code between programming languages with precision.
-      Upload files, paste code, and download converted results instantly.
-    </p>
+  <!-- Main Content -->
+  <main class="flex-1 flex flex-col p-4 lg:p-6 overflow-auto">
 
-    <!-- Stats -->
-    <div class="grid grid-cols-3 gap-6 mb-8">
-      <div class="bg-gray-800/50 backdrop-blur text-center py-6 px-8 rounded-xl border border-gray-700">
-        <p id="conversionCount" class="text-3xl font-bold text-white">0</p>
-        <p class="text-sm text-gray-400">Conversions</p>
-      </div>
-      <div class="bg-gray-800/50 backdrop-blur text-center py-6 px-8 rounded-xl border border-gray-700">
-        <p id="successRate" class="text-3xl font-bold text-green-400">100%</p>
-        <p class="text-sm text-gray-400">Success Rate</p>
-      </div>
-      <div class="bg-gray-800/50 backdrop-blur text-center py-6 px-8 rounded-xl border border-gray-700">
-        <p id="avgTime" class="text-3xl font-bold text-purple-400">0.0s</p>
-        <p class="text-sm text-gray-400">Avg Time</p>
-      </div>
-    </div>
+    <!-- Side-by-Side Editors Section -->
+    <div class="bg-gray-800/50 backdrop-blur w-full max-w-7xl mx-auto rounded-xl border border-gray-700 overflow-hidden">
 
-    <!-- Converter Box -->
-    <div class="bg-gray-800/50 backdrop-blur w-full max-w-6xl p-6 rounded-xl border border-gray-700">
-      <div class="grid grid-cols-2 gap-6">
+      <!-- Editor Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-700">
 
-        <!-- Source Panel -->
+        <!-- Source Code Panel (Left) -->
         <div class="flex flex-col">
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-sm font-medium text-gray-300">From Language</label>
-            <div class="flex gap-2">
-              <button onclick="clearSource()" class="btn-icon p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs" title="Clear">
+          <!-- Panel Header -->
+          <div class="flex items-center justify-between px-4 py-3 bg-gray-900/50 border-b border-gray-700">
+            <div class="flex items-center gap-3">
+              <h3 class="text-sm font-semibold text-gray-200">Source Code</h3>
+              <span id="sourceLanguageBadge" class="language-badge hidden px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded-full font-medium uppercase">
+                Python
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="sourceLineCount" class="text-xs text-gray-500">0 lines</span>
+              <button onclick="clearSource()" class="btn-icon p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs" title="Clear source">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                 </svg>
@@ -132,48 +152,51 @@
             </div>
           </div>
 
-          <select id="fromLanguage" class="w-full p-2.5 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition">
-            <option value="">Auto-detect</option>
-            <option value="python">Python</option>
-            <option value="javascript">JavaScript</option>
-            <option value="java">Java</option>
-            <option value="typescript">TypeScript</option>
-            <option value="cpp">C++</option>
-            <option value="csharp">C#</option>
-            <option value="go">Go</option>
-            <option value="rust">Rust</option>
-            <option value="ruby">Ruby</option>
-            <option value="php">PHP</option>
-          </select>
-
-          <!-- File Upload Zone -->
-          <div id="dropZone" class="drop-zone mt-4 border-2 border-dashed border-gray-600 rounded-lg p-4 text-center cursor-pointer hover:border-purple-500 transition">
-            <input type="file" id="fileInput" class="hidden" accept=".py,.js,.ts,.java,.cpp,.c,.cs,.go,.rs,.rb,.php,.txt" />
-            <svg class="w-8 h-8 mx-auto mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-            </svg>
-            <p class="text-sm text-gray-400">Drag & drop a file or <span class="text-purple-400 underline">browse</span></p>
-            <p class="text-xs text-gray-500 mt-1">.py, .js, .ts, .java, .cpp, .go, .rs, .rb, .php</p>
-          </div>
-
-          <div class="relative mt-4 flex-1">
-            <textarea id="sourceCode" placeholder="// Paste your code here or upload a file..."
-              class="code-textarea h-72 w-full bg-gray-900 border border-gray-600 rounded-lg p-4 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"></textarea>
-            <div class="absolute bottom-2 right-2 text-xs text-gray-500">
-              <span id="sourceLineCount">0</span> lines
+          <!-- Language Selector & Upload -->
+          <div class="px-4 py-3 bg-gray-900/30 border-b border-gray-700">
+            <div class="flex gap-3">
+              <select id="fromLanguage" class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition">
+                <option value="">Auto-detect language</option>
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript</option>
+                <option value="java">Java</option>
+                <option value="typescript">TypeScript</option>
+                <option value="cpp">C++</option>
+                <option value="csharp">C#</option>
+                <option value="go">Go</option>
+                <option value="rust">Rust</option>
+                <option value="ruby">Ruby</option>
+                <option value="php">PHP</option>
+              </select>
+              <label id="dropZone" class="drop-zone flex items-center gap-2 px-3 py-2 border border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-purple-500 transition text-xs text-gray-400">
+                <input type="file" id="fileInput" class="hidden" accept=".py,.js,.ts,.java,.cpp,.c,.cs,.go,.rs,.rb,.php,.txt" />
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+                <span>Upload</span>
+              </label>
             </div>
           </div>
+
+          <!-- Source Editor -->
+          <div class="relative flex-1 min-h-[300px] lg:min-h-[400px]">
+            <textarea id="sourceCode" placeholder="// Paste your source code here or upload a file...&#10;// The source language will be auto-detected"
+              class="code-textarea absolute inset-0 w-full h-full bg-gray-900 p-4 text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500/50"></textarea>
+          </div>
         </div>
 
-        <!-- Swap Button (Center) -->
-        <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 hidden md:block" style="position: relative; left: 0; top: 0; transform: none;">
-        </div>
-
-        <!-- Target Panel -->
+        <!-- Converted Code Panel (Right) -->
         <div class="flex flex-col">
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-sm font-medium text-gray-300">To Language</label>
-            <div class="flex gap-2">
+          <!-- Panel Header -->
+          <div class="flex items-center justify-between px-4 py-3 bg-gray-900/50 border-b border-gray-700">
+            <div class="flex items-center gap-3">
+              <h3 class="text-sm font-semibold text-gray-200">Converted Code</h3>
+              <span id="targetLanguageBadge" class="language-badge hidden px-2 py-0.5 bg-green-600/20 text-green-400 rounded-full font-medium uppercase">
+                JavaScript
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="outputLineCount" class="text-xs text-gray-500">0 lines</span>
               <button onclick="copyOutput()" class="btn-icon p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs" title="Copy to clipboard">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -187,74 +210,215 @@
             </div>
           </div>
 
-          <div class="flex gap-2">
-            <select id="toLanguage" class="flex-1 p-2.5 bg-gray-900 border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition">
-              <option value="">Select target language</option>
-              <option value="python">Python</option>
-              <option value="javascript">JavaScript</option>
-              <option value="java">Java</option>
-              <option value="typescript">TypeScript</option>
-              <option value="cpp">C++</option>
-              <option value="csharp">C#</option>
-              <option value="go">Go</option>
-              <option value="rust">Rust</option>
-              <option value="ruby">Ruby</option>
-              <option value="php">PHP</option>
-            </select>
-            <button onclick="swapLanguages()" class="p-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg transition" title="Swap languages">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-              </svg>
-            </button>
-          </div>
-
-          <div class="relative mt-4 flex-1">
-            <textarea id="outputCode" placeholder="// Converted code will appear here..." readonly
-              class="code-textarea h-72 w-full bg-gray-900 border border-gray-600 rounded-lg p-4 text-green-400 focus:border-purple-500 transition"></textarea>
-            <div class="absolute bottom-2 right-2 text-xs text-gray-500">
-              <span id="outputLineCount">0</span> lines
+          <!-- Target Language Selector -->
+          <div class="px-4 py-3 bg-gray-900/30 border-b border-gray-700">
+            <div class="flex gap-3">
+              <select id="toLanguage" class="flex-1 p-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition">
+                <option value="">Select target language</option>
+                <option value="python">Python</option>
+                <option value="javascript">JavaScript</option>
+                <option value="java">Java</option>
+                <option value="typescript">TypeScript</option>
+                <option value="cpp">C++</option>
+                <option value="csharp">C#</option>
+                <option value="go">Go</option>
+                <option value="rust">Rust</option>
+                <option value="ruby">Ruby</option>
+                <option value="php">PHP</option>
+              </select>
+              <button onclick="swapLanguages()" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition" title="Swap languages & code">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                </svg>
+              </button>
             </div>
           </div>
 
-          <!-- Conversion Metadata -->
-          <div id="conversionMetadata" class="hidden mt-3 p-4 bg-gray-900 border border-gray-600 rounded-lg">
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-gray-400 text-sm">Conversion Confidence</span>
-              <div class="flex items-center gap-2">
-                <div id="confidenceBar" class="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                  <div id="confidenceBarFill" class="h-full bg-green-500 transition-all duration-500" style="width: 0%"></div>
-                </div>
-                <span id="confidenceScore" class="text-green-400 font-bold text-sm">-</span>
-              </div>
-            </div>
-            <div id="conversionWarnings" class="text-yellow-400 text-sm"></div>
+          <!-- Output Editor (Read-only) -->
+          <div class="relative flex-1 min-h-[300px] lg:min-h-[400px]">
+            <textarea id="outputCode" placeholder="// Converted code will appear here after conversion...&#10;// Click 'Convert Code' to start" readonly
+              class="code-textarea absolute inset-0 w-full h-full bg-gray-900 p-4 text-emerald-400 focus:outline-none cursor-default"></textarea>
           </div>
         </div>
       </div>
 
-      <!-- Convert Button -->
-      <div class="flex justify-center mt-6 gap-4">
-        <button id="convertBtn" onclick="convertCode()" class="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 px-8 py-3 rounded-lg font-semibold transition transform hover:scale-105">
+      <!-- Convert Button Bar -->
+      <div class="flex items-center justify-center gap-4 px-4 py-4 bg-gray-900/50 border-t border-gray-700">
+        <button id="convertBtn" onclick="convertCode()" class="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 px-8 py-3 rounded-lg font-semibold transition transform hover:scale-105 shadow-lg shadow-purple-500/20">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
           </svg>
           Convert Code
         </button>
+        <div class="text-xs text-gray-500">
+          <kbd class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-400">Ctrl</kbd>+<kbd class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-400">Enter</kbd>
+        </div>
       </div>
     </div>
 
-    <!-- Keyboard Shortcuts -->
-    <div class="mt-6 text-center">
-      <p class="text-xs text-gray-500">
-        <kbd class="px-2 py-1 bg-gray-700 rounded text-gray-300">Ctrl</kbd> + <kbd class="px-2 py-1 bg-gray-700 rounded text-gray-300">Enter</kbd> to convert
-        &nbsp;&nbsp;|&nbsp;&nbsp;
-        <kbd class="px-2 py-1 bg-gray-700 rounded text-gray-300">Ctrl</kbd> + <kbd class="px-2 py-1 bg-gray-700 rounded text-gray-300">S</kbd> to download
-      </p>
+    <!-- Conversion Report Panel (Below Editors) -->
+    <div id="conversionReport" class="hidden w-full max-w-7xl mx-auto mt-6 bg-gray-800/50 backdrop-blur rounded-xl border border-gray-700 overflow-hidden">
+
+      <!-- Report Header -->
+      <div class="flex items-center justify-between px-6 py-4 bg-gray-900/50 border-b border-gray-700">
+        <div class="flex items-center gap-3">
+          <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <h3 class="text-lg font-semibold text-white">Conversion Report</h3>
+        </div>
+        <div id="reportTimestamp" class="text-xs text-gray-500"></div>
+      </div>
+
+      <!-- Report Content -->
+      <div class="p-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          <!-- Column 1: Overall Confidence Score -->
+          <div class="lg:col-span-1">
+            <div id="confidenceCard" class="bg-gray-900/50 rounded-xl p-6 border border-gray-700 text-center">
+              <!-- Circular Progress -->
+              <div class="relative w-32 h-32 mx-auto mb-4">
+                <svg class="w-full h-full transform -rotate-90">
+                  <circle cx="64" cy="64" r="56" stroke="currentColor" stroke-width="8" fill="none" class="text-gray-700"/>
+                  <circle id="confidenceRing" cx="64" cy="64" r="56" stroke="currentColor" stroke-width="8" fill="none"
+                    class="confidence-ring text-green-500"
+                    stroke-dasharray="352"
+                    stroke-dashoffset="352"
+                    stroke-linecap="round"/>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span id="confidencePercent" class="text-3xl font-bold text-green-400">0%</span>
+                </div>
+              </div>
+              <h4 class="text-lg font-semibold text-white mb-1">Conversion Confidence</h4>
+              <p id="confidenceLabel" class="text-sm text-green-400 font-medium">Awaiting Conversion</p>
+              <p id="confidenceHint" class="text-xs text-gray-500 mt-2"></p>
+            </div>
+          </div>
+
+          <!-- Column 2: Confidence Breakdown & Coverage -->
+          <div class="lg:col-span-2 space-y-6">
+
+            <!-- Confidence Breakdown -->
+            <div class="bg-gray-900/50 rounded-xl p-5 border border-gray-700">
+              <h4 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                Confidence Breakdown
+              </h4>
+              <div class="space-y-3">
+                <!-- Structure Preservation -->
+                <div>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-gray-400">Structure Preservation</span>
+                    <span id="structureScore" class="text-gray-300">—</span>
+                  </div>
+                  <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div id="structureBar" class="progress-bar h-full bg-blue-500 rounded-full" style="width: 0%"></div>
+                  </div>
+                </div>
+                <!-- Syntax Validity -->
+                <div>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-gray-400">Syntax Validity</span>
+                    <span id="syntaxScore" class="text-gray-300">—</span>
+                  </div>
+                  <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div id="syntaxBar" class="progress-bar h-full bg-purple-500 rounded-full" style="width: 0%"></div>
+                  </div>
+                </div>
+                <!-- Conversion Completeness -->
+                <div>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-gray-400">Conversion Completeness</span>
+                    <span id="completenessScore" class="text-gray-300">—</span>
+                  </div>
+                  <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div id="completenessBar" class="progress-bar h-full bg-emerald-500 rounded-full" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Accuracy & Coverage Summary -->
+            <div class="bg-gray-900/50 rounded-xl p-5 border border-gray-700">
+              <h4 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Accuracy & Coverage
+              </h4>
+              <div id="constructsSummary" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <p class="text-xs text-gray-500 col-span-full">No conversion data yet</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warnings & Recommendations -->
+        <div id="warningsSection" class="mt-6 bg-gray-900/50 rounded-xl p-5 border border-gray-700">
+          <h4 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            Warnings & Recommendations
+          </h4>
+          <div id="warningsList" class="space-y-2">
+            <p class="text-sm text-gray-400 flex items-center gap-2">
+              <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              No major issues detected.
+            </p>
+          </div>
+          <p id="warningsSummary" class="hidden text-xs text-yellow-400 mt-3 pt-3 border-t border-gray-700">
+            Manual review recommended for highlighted items.
+          </p>
+        </div>
+
+        <!-- Collapsible Metadata Section -->
+        <div class="mt-6">
+          <button onclick="toggleMetadata()" class="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 transition">
+            <svg id="metadataChevron" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+            Technical Metadata
+          </button>
+          <div id="metadataContent" class="collapsible-content mt-3">
+            <div class="bg-gray-900/50 rounded-xl p-5 border border-gray-700">
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                <div>
+                  <p id="metaLinesProcessed" class="text-2xl font-bold text-purple-400">—</p>
+                  <p class="text-xs text-gray-500">Lines Processed</p>
+                </div>
+                <div>
+                  <p id="metaBlocksDetected" class="text-2xl font-bold text-blue-400">—</p>
+                  <p class="text-xs text-gray-500">Blocks Detected</p>
+                </div>
+                <div>
+                  <p id="metaConversionLevel" class="text-2xl font-bold text-emerald-400">—</p>
+                  <p class="text-xs text-gray-500">Conversion Level</p>
+                </div>
+                <div>
+                  <p id="metaConversionTime" class="text-2xl font-bold text-yellow-400">—</p>
+                  <p class="text-xs text-gray-500">Conversion Time</p>
+                </div>
+              </div>
+              <div id="metaUnsupported" class="hidden mt-4 pt-4 border-t border-gray-700">
+                <p class="text-xs text-gray-400 mb-2">Unsupported Constructs:</p>
+                <div id="unsupportedList" class="text-xs text-red-400"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Footer -->
-    <p class="text-gray-500 text-sm mt-6">
-      Powered by FastAPI backend with 122+ conversion rules
+    <p class="text-gray-500 text-xs text-center mt-6">
+      Powered by FastAPI backend • 122+ conversion rules • Python ↔ JavaScript
     </p>
   </main>
 
@@ -288,9 +452,24 @@
       'php': 'php'
     };
 
+    // Language display names
+    const languageNames = {
+      'python': 'Python',
+      'javascript': 'JavaScript',
+      'typescript': 'TypeScript',
+      'java': 'Java',
+      'cpp': 'C++',
+      'csharp': 'C#',
+      'go': 'Go',
+      'rust': 'Rust',
+      'ruby': 'Ruby',
+      'php': 'PHP'
+    };
+
     // Stats tracking
     let stats = JSON.parse(localStorage.getItem('codeTransformStats') || '{"conversions": 0, "totalTime": 0, "successes": 0}');
     let history = JSON.parse(localStorage.getItem('codeTransformHistory') || '[]');
+    let lastConversionData = null;
 
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
@@ -299,7 +478,36 @@
       setupDropZone();
       setupLineCounters();
       setupKeyboardShortcuts();
+      setupLanguageBadges();
     });
+
+    // Language badges
+    function setupLanguageBadges() {
+      document.getElementById('fromLanguage').addEventListener('change', updateSourceBadge);
+      document.getElementById('toLanguage').addEventListener('change', updateTargetBadge);
+    }
+
+    function updateSourceBadge() {
+      const lang = document.getElementById('fromLanguage').value;
+      const badge = document.getElementById('sourceLanguageBadge');
+      if (lang && languageNames[lang]) {
+        badge.textContent = languageNames[lang];
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    function updateTargetBadge() {
+      const lang = document.getElementById('toLanguage').value;
+      const badge = document.getElementById('targetLanguageBadge');
+      if (lang && languageNames[lang]) {
+        badge.textContent = languageNames[lang];
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
 
     // Toast notifications
     function showToast(message, type = 'success') {
@@ -317,7 +525,10 @@
       const dropZone = document.getElementById('dropZone');
       const fileInput = document.getElementById('fileInput');
 
-      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('click', (e) => {
+        e.preventDefault();
+        fileInput.click();
+      });
 
       dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -350,7 +561,8 @@
         document.getElementById('sourceCode').value = e.target.result;
         if (language) {
           document.getElementById('fromLanguage').value = language;
-          showToast(`Detected ${language.charAt(0).toUpperCase() + language.slice(1)} from file extension`);
+          updateSourceBadge();
+          showToast(`Detected ${languageNames[language] || language} from file extension`);
         }
         updateSourceLineCount();
       };
@@ -360,20 +572,19 @@
     // Line counters
     function setupLineCounters() {
       const sourceCode = document.getElementById('sourceCode');
-      const outputCode = document.getElementById('outputCode');
-
       sourceCode.addEventListener('input', updateSourceLineCount);
-      outputCode.addEventListener('input', updateOutputLineCount);
     }
 
     function updateSourceLineCount() {
-      const lines = document.getElementById('sourceCode').value.split('\n').length;
-      document.getElementById('sourceLineCount').textContent = lines;
+      const code = document.getElementById('sourceCode').value;
+      const lines = code ? code.split('\n').length : 0;
+      document.getElementById('sourceLineCount').textContent = `${lines} line${lines !== 1 ? 's' : ''}`;
     }
 
     function updateOutputLineCount() {
-      const lines = document.getElementById('outputCode').value.split('\n').length;
-      document.getElementById('outputLineCount').textContent = lines;
+      const code = document.getElementById('outputCode').value;
+      const lines = code ? code.split('\n').length : 0;
+      document.getElementById('outputLineCount').textContent = `${lines} line${lines !== 1 ? 's' : ''}`;
     }
 
     // Keyboard shortcuts
@@ -393,7 +604,7 @@
     // Language detection
     async function detectLanguage() {
       const code = document.getElementById("sourceCode").value;
-      if (!code.trim()) return;
+      if (!code.trim()) return null;
 
       try {
         const response = await fetch("http://127.0.0.1:8000/detect-language", {
@@ -405,9 +616,13 @@
         const data = await response.json();
         if (data.detected_language !== "unknown") {
           document.getElementById("fromLanguage").value = data.detected_language;
+          updateSourceBadge();
+          return data;
         }
+        return null;
       } catch (error) {
         console.error("Error detecting language:", error);
+        return null;
       }
     }
 
@@ -432,7 +647,7 @@
         await detectLanguage();
         source = document.getElementById("fromLanguage").value;
         if (!source) {
-          showToast("Could not detect source language", "error");
+          showToast("Could not detect source language. Please select manually.", "error");
           return;
         }
       }
@@ -458,8 +673,13 @@
         const endTime = performance.now();
         const conversionTime = ((endTime - startTime) / 1000).toFixed(2);
 
+        // Store conversion time in data for report
+        data._conversionTime = conversionTime;
+        lastConversionData = data;
+
         document.getElementById("outputCode").value = data.converted_code;
         updateOutputLineCount();
+        updateTargetBadge();
 
         // Update stats
         stats.conversions++;
@@ -471,8 +691,8 @@
         // Add to history
         addToHistory(code, data.converted_code, source, target, data.conversion_confidence);
 
-        // Display metadata
-        displayMetadata(data);
+        // Render comprehensive report
+        renderConversionReport(data, source, target);
 
         showToast(`Converted in ${conversionTime}s`);
       } catch (error) {
@@ -484,41 +704,179 @@
       }
     }
 
-    function displayMetadata(data) {
-      const metadataDiv = document.getElementById("conversionMetadata");
-      const confidenceSpan = document.getElementById("confidenceScore");
-      const confidenceBarFill = document.getElementById("confidenceBarFill");
-      const warningsDiv = document.getElementById("conversionWarnings");
+    // Render comprehensive conversion report
+    function renderConversionReport(data, source, target) {
+      const report = document.getElementById('conversionReport');
+      report.classList.remove('hidden');
 
-      if (data.conversion_confidence !== undefined) {
-        metadataDiv.classList.remove("hidden");
-        const confidencePercent = (data.conversion_confidence * 100).toFixed(1);
-        confidenceSpan.textContent = confidencePercent + "%";
-        confidenceBarFill.style.width = confidencePercent + "%";
+      // Timestamp
+      document.getElementById('reportTimestamp').textContent = new Date().toLocaleString();
 
-        // Color code confidence
-        if (data.conversion_confidence >= 0.8) {
-          confidenceSpan.className = "text-green-400 font-bold text-sm";
-          confidenceBarFill.className = "h-full bg-green-500 transition-all duration-500";
-        } else if (data.conversion_confidence >= 0.6) {
-          confidenceSpan.className = "text-yellow-400 font-bold text-sm";
-          confidenceBarFill.className = "h-full bg-yellow-500 transition-all duration-500";
-        } else {
-          confidenceSpan.className = "text-red-400 font-bold text-sm";
-          confidenceBarFill.className = "h-full bg-red-500 transition-all duration-500";
-        }
+      // Calculate confidence percentage
+      const confidence = data.conversion_confidence || 0;
+      const confidencePercent = (confidence * 100).toFixed(1);
 
-        // Display warnings
-        if (data.warnings && data.warnings.length > 0) {
-          warningsDiv.innerHTML = "<p class='font-semibold mb-1'>Warnings:</p>" +
-            data.warnings.slice(0, 3).map(w => `<p class='text-xs'>• ${w}</p>`).join("");
-          if (data.warnings.length > 3) {
-            warningsDiv.innerHTML += `<p class='text-gray-400 text-xs mt-1'>... and ${data.warnings.length - 3} more</p>`;
-          }
-        } else {
-          warningsDiv.innerHTML = "<p class='text-green-400 text-xs'>No warnings - clean conversion!</p>";
-        }
+      // Update circular progress
+      const ring = document.getElementById('confidenceRing');
+      const circumference = 2 * Math.PI * 56; // r=56
+      const offset = circumference - (confidence * circumference);
+      ring.style.strokeDashoffset = offset;
+
+      // Update confidence display
+      document.getElementById('confidencePercent').textContent = `${confidencePercent}%`;
+
+      // Color coding and labels
+      const confidenceCard = document.getElementById('confidenceCard');
+      const percentEl = document.getElementById('confidencePercent');
+      const labelEl = document.getElementById('confidenceLabel');
+      const hintEl = document.getElementById('confidenceHint');
+
+      if (confidence >= 0.85) {
+        ring.classList.remove('text-yellow-500', 'text-red-500');
+        ring.classList.add('text-green-500');
+        percentEl.classList.remove('text-yellow-400', 'text-red-400');
+        percentEl.classList.add('text-green-400');
+        labelEl.textContent = 'High Confidence';
+        labelEl.className = 'text-sm text-green-400 font-medium';
+        hintEl.textContent = 'Conversion completed successfully with minimal modifications needed.';
+        confidenceCard.classList.remove('warning-state');
+      } else if (confidence >= 0.65) {
+        ring.classList.remove('text-green-500', 'text-red-500');
+        ring.classList.add('text-yellow-500');
+        percentEl.classList.remove('text-green-400', 'text-red-400');
+        percentEl.classList.add('text-yellow-400');
+        labelEl.textContent = 'Review Recommended';
+        labelEl.className = 'text-sm text-yellow-400 font-medium';
+        hintEl.textContent = 'Some constructs may require manual verification.';
+        confidenceCard.classList.remove('warning-state');
+      } else {
+        ring.classList.remove('text-green-500', 'text-yellow-500');
+        ring.classList.add('text-red-500');
+        percentEl.classList.remove('text-green-400', 'text-yellow-400');
+        percentEl.classList.add('text-red-400');
+        labelEl.textContent = 'Manual Review Required';
+        labelEl.className = 'text-sm text-red-400 font-medium';
+        hintEl.textContent = 'Significant portions may need manual adjustment.';
+        confidenceCard.classList.add('warning-state');
       }
+
+      // Confidence breakdown (derived from metadata)
+      const metadata = data.metadata || {};
+      const linesProcessed = metadata.lines_processed || 0;
+      const blocksDetected = metadata.blocks_detected || 0;
+
+      // Derive scores from available data
+      const structureScore = Math.min(100, confidence * 100 + (blocksDetected > 0 ? 10 : 0));
+      const syntaxScore = confidence >= 0.6 ? Math.min(100, confidence * 100 + 5) : confidence * 100;
+      const completenessScore = linesProcessed > 0 ? Math.min(100, (1 - (data.unsupported_lines_count || 0) / linesProcessed) * 100) : confidence * 100;
+
+      document.getElementById('structureScore').textContent = `${structureScore.toFixed(0)}%`;
+      document.getElementById('structureBar').style.width = `${structureScore}%`;
+
+      document.getElementById('syntaxScore').textContent = `${syntaxScore.toFixed(0)}%`;
+      document.getElementById('syntaxBar').style.width = `${syntaxScore}%`;
+
+      document.getElementById('completenessScore').textContent = `${completenessScore.toFixed(0)}%`;
+      document.getElementById('completenessBar').style.width = `${completenessScore}%`;
+
+      // Accuracy & Coverage Summary
+      const constructsSummary = document.getElementById('constructsSummary');
+      const constructs = metadata.constructs_found || {};
+
+      if (Object.keys(constructs).length > 0) {
+        constructsSummary.innerHTML = Object.entries(constructs).map(([name, count]) => `
+          <div class="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg">
+            <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span class="text-xs text-gray-300">${name}</span>
+            <span class="text-xs text-gray-500">(${count})</span>
+          </div>
+        `).join('');
+      } else {
+        // Infer from conversion level
+        const level = data.conversion_level || 1;
+        const supportedTypes = [];
+        if (level >= 1) supportedTypes.push('Variables', 'Literals', 'Comments');
+        if (level >= 2) supportedTypes.push('Functions', 'Conditions', 'Loops');
+        if (level >= 3) supportedTypes.push('Complex Expressions');
+
+        constructsSummary.innerHTML = supportedTypes.map(type => `
+          <div class="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg">
+            <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span class="text-xs text-gray-300">${type}</span>
+          </div>
+        `).join('');
+      }
+
+      // Add unsupported constructs if any
+      const unsupportedConstructs = data.unsupported_constructs || [];
+      if (unsupportedConstructs.length > 0) {
+        const unsupportedHtml = unsupportedConstructs.slice(0, 5).map(c => `
+          <div class="flex items-center gap-2 px-3 py-2 bg-red-900/20 border border-red-800/30 rounded-lg">
+            <svg class="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            <span class="text-xs text-red-300">${c.construct || c.type || 'Unknown'}</span>
+          </div>
+        `).join('');
+        constructsSummary.innerHTML += unsupportedHtml;
+      }
+
+      // Warnings & Recommendations
+      const warningsList = document.getElementById('warningsList');
+      const warningsSummary = document.getElementById('warningsSummary');
+      const warnings = data.warnings || [];
+
+      if (warnings.length > 0) {
+        warningsList.innerHTML = warnings.map(w => `
+          <div class="flex items-start gap-2 p-2 bg-yellow-900/20 border border-yellow-800/30 rounded-lg">
+            <svg class="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <span class="text-sm text-yellow-200">${w}</span>
+          </div>
+        `).join('');
+        warningsSummary.classList.remove('hidden');
+      } else {
+        warningsList.innerHTML = `
+          <p class="text-sm text-gray-400 flex items-center gap-2">
+            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            No major issues detected.
+          </p>
+        `;
+        warningsSummary.classList.add('hidden');
+      }
+
+      // Metadata
+      document.getElementById('metaLinesProcessed').textContent = linesProcessed || '—';
+      document.getElementById('metaBlocksDetected').textContent = blocksDetected || '—';
+      document.getElementById('metaConversionLevel').textContent = data.conversion_level || '—';
+      document.getElementById('metaConversionTime').textContent = data._conversionTime ? `${data._conversionTime}s` : '—';
+
+      // Unsupported constructs in metadata
+      const metaUnsupported = document.getElementById('metaUnsupported');
+      const unsupportedList = document.getElementById('unsupportedList');
+      if (unsupportedConstructs.length > 0) {
+        metaUnsupported.classList.remove('hidden');
+        unsupportedList.innerHTML = unsupportedConstructs.map(c =>
+          `<span class="inline-block px-2 py-1 bg-red-900/30 rounded mr-1 mb-1">${c.construct || c.type || 'Unknown'} (line ${c.line || '?'})</span>`
+        ).join('');
+      } else {
+        metaUnsupported.classList.add('hidden');
+      }
+    }
+
+    // Toggle metadata section
+    function toggleMetadata() {
+      const content = document.getElementById('metadataContent');
+      const chevron = document.getElementById('metadataChevron');
+      content.classList.toggle('expanded');
+      chevron.classList.toggle('rotate-180');
     }
 
     // Utility functions
@@ -526,8 +884,6 @@
       document.getElementById('conversionCount').textContent = stats.conversions;
       const successRate = stats.conversions > 0 ? ((stats.successes / stats.conversions) * 100).toFixed(0) : 100;
       document.getElementById('successRate').textContent = successRate + '%';
-      const avgTime = stats.conversions > 0 ? (stats.totalTime / stats.conversions).toFixed(1) : 0;
-      document.getElementById('avgTime').textContent = avgTime + 's';
     }
 
     function swapLanguages() {
@@ -546,7 +902,9 @@
 
       updateSourceLineCount();
       updateOutputLineCount();
-      showToast('Languages swapped!', 'info');
+      updateSourceBadge();
+      updateTargetBadge();
+      showToast('Languages & code swapped!', 'info');
     }
 
     function copyOutput() {
@@ -585,6 +943,7 @@
     function clearSource() {
       document.getElementById('sourceCode').value = '';
       document.getElementById('fromLanguage').value = '';
+      document.getElementById('sourceLanguageBadge').classList.add('hidden');
       updateSourceLineCount();
       showToast('Source cleared', 'info');
     }
@@ -602,7 +961,7 @@
         timestamp: new Date().toLocaleString()
       };
       history.unshift(entry);
-      if (history.length > 20) history.pop(); // Keep last 20
+      if (history.length > 20) history.pop();
       localStorage.setItem('codeTransformHistory', JSON.stringify(history));
       renderHistory();
     }
@@ -617,8 +976,8 @@
       list.innerHTML = history.map(h => `
         <div class="history-item p-3 rounded cursor-pointer mb-2 bg-gray-800 border border-gray-700" onclick="loadHistoryItem(${h.id})">
           <div class="flex justify-between items-center mb-1">
-            <span class="text-xs font-semibold text-purple-400">${h.fromLang} → ${h.toLang}</span>
-            <span class="text-xs ${h.confidence >= 0.8 ? 'text-green-400' : h.confidence >= 0.6 ? 'text-yellow-400' : 'text-red-400'}">${(h.confidence * 100).toFixed(0)}%</span>
+            <span class="text-xs font-semibold text-purple-400">${languageNames[h.fromLang] || h.fromLang} → ${languageNames[h.toLang] || h.toLang}</span>
+            <span class="text-xs ${h.confidence >= 0.85 ? 'text-green-400' : h.confidence >= 0.65 ? 'text-yellow-400' : 'text-red-400'}">${(h.confidence * 100).toFixed(0)}%</span>
           </div>
           <p class="text-xs text-gray-400 truncate">${h.sourcePreview}</p>
           <p class="text-xs text-gray-600 mt-1">${h.timestamp}</p>
@@ -635,6 +994,8 @@
         document.getElementById('toLanguage').value = item.toLang;
         updateSourceLineCount();
         updateOutputLineCount();
+        updateSourceBadge();
+        updateTargetBadge();
         toggleHistory();
         showToast('History item loaded', 'info');
       }
