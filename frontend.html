@@ -20,6 +20,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-php.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
+  <!-- Diff library for line-by-line comparison -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
   <style>
     .drop-zone {
       transition: all 0.3s ease;
@@ -125,6 +127,55 @@
     .code-editor-container pre[class*="language-"] {
       background: transparent !important;
       text-shadow: none !important;
+    }
+    /* Diff view styles */
+    .diff-container {
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .diff-line {
+      display: flex;
+      padding: 2px 8px;
+      border-left: 3px solid transparent;
+    }
+    .diff-line-number {
+      width: 40px;
+      text-align: right;
+      padding-right: 12px;
+      color: #6b7280;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .diff-line-content {
+      flex: 1;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .diff-added {
+      background-color: rgba(34, 197, 94, 0.15);
+      border-left-color: #22c55e;
+    }
+    .diff-added .diff-line-content {
+      color: #86efac;
+    }
+    .diff-removed {
+      background-color: rgba(239, 68, 68, 0.15);
+      border-left-color: #ef4444;
+    }
+    .diff-removed .diff-line-content {
+      color: #fca5a5;
+    }
+    .diff-unchanged {
+      color: #9ca3af;
+    }
+    .diff-stats {
+      display: flex;
+      gap: 16px;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+      font-size: 12px;
     }
   </style>
 </head>
@@ -445,6 +496,26 @@
           </p>
         </div>
 
+        <!-- Diff View Section -->
+        <div id="diffSection" class="mt-6 bg-gray-900/50 rounded-xl border border-gray-700 overflow-hidden">
+          <div class="flex items-center justify-between px-5 py-3 border-b border-gray-700">
+            <h4 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
+              <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+              Line-by-Line Diff View
+            </h4>
+            <div id="diffStats" class="diff-stats hidden">
+              <span class="text-green-400">+<span id="diffAdded">0</span> added</span>
+              <span class="text-red-400">-<span id="diffRemoved">0</span> removed</span>
+              <span class="text-gray-400"><span id="diffUnchanged">0</span> unchanged</span>
+            </div>
+          </div>
+          <div id="diffContent" class="diff-container max-h-[400px] overflow-auto p-4 bg-gray-900">
+            <p class="text-sm text-gray-500 text-center py-8">Diff will appear after conversion</p>
+          </div>
+        </div>
+
         <!-- Collapsible Metadata Section -->
         <div class="mt-6">
           <button onclick="toggleMetadata()" class="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 transition">
@@ -614,6 +685,71 @@
       // Set text and highlight
       codeEl.textContent = code || ' ';
       Prism.highlightElement(codeEl);
+    }
+
+    // Diff view functions
+    function renderDiffView(sourceCode, convertedCode) {
+      const diffContent = document.getElementById('diffContent');
+      const diffStats = document.getElementById('diffStats');
+
+      if (!sourceCode || !convertedCode) {
+        diffContent.innerHTML = '<p class="text-sm text-gray-500 text-center py-8">Diff will appear after conversion</p>';
+        diffStats.classList.add('hidden');
+        return;
+      }
+
+      // Use jsdiff to compute line differences
+      const diff = Diff.diffLines(sourceCode, convertedCode);
+
+      let html = '';
+      let lineNum = 1;
+      let addedCount = 0;
+      let removedCount = 0;
+      let unchangedCount = 0;
+
+      diff.forEach(part => {
+        const lines = part.value.split('\n');
+        // Remove last empty element if exists
+        if (lines[lines.length - 1] === '') lines.pop();
+
+        lines.forEach(line => {
+          let className = 'diff-unchanged';
+          let prefix = ' ';
+
+          if (part.added) {
+            className = 'diff-added';
+            prefix = '+';
+            addedCount++;
+          } else if (part.removed) {
+            className = 'diff-removed';
+            prefix = '-';
+            removedCount++;
+          } else {
+            unchangedCount++;
+          }
+
+          const escapedLine = escapeHtml(line) || '&nbsp;';
+          html += `<div class="diff-line ${className}">
+            <span class="diff-line-number">${lineNum}</span>
+            <span class="diff-line-content">${prefix} ${escapedLine}</span>
+          </div>`;
+          lineNum++;
+        });
+      });
+
+      diffContent.innerHTML = html;
+
+      // Update stats
+      document.getElementById('diffAdded').textContent = addedCount;
+      document.getElementById('diffRemoved').textContent = removedCount;
+      document.getElementById('diffUnchanged').textContent = unchangedCount;
+      diffStats.classList.remove('hidden');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
 
     // Language badges
@@ -830,6 +966,9 @@
 
         // Render comprehensive report
         renderConversionReport(data, source, target);
+
+        // Render diff view
+        renderDiffView(code, data.converted_code);
 
         showToast(`Converted in ${conversionTime}s`);
       } catch (error) {
