@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple
 
 
 @dataclass
@@ -31,6 +31,7 @@ class IndentationTracker:
         self.max_indent_level = 0
         self.block_count = 0
         self.indent_history: List[int] = []
+        self.line_indent_map: List[Tuple[int, int]] = []  # (line_num, indent_level)
 
     def get_indent_level(self, line: str) -> int:
         """
@@ -46,6 +47,25 @@ class IndentationTracker:
             # Calculate indent level (divide by 4 for Python standard)
             return leading_spaces // 4 if leading_spaces >= 4 else (1 if leading_spaces > 0 else 0)
         return self.current_indent
+
+    def record_line_indent(self, line_num: int, indent_level: int):
+        """Record indentation level for a specific line."""
+        self.line_indent_map.append((line_num, indent_level))
+
+    def get_indent_transitions(self) -> List[Tuple[int, int, int]]:
+        """
+        Get all indentation transitions.
+
+        Returns:
+            List of (line_num, prev_indent, curr_indent) tuples
+        """
+        transitions = []
+        for i in range(1, len(self.line_indent_map)):
+            prev_line, prev_indent = self.line_indent_map[i - 1]
+            curr_line, curr_indent = self.line_indent_map[i]
+            if prev_indent != curr_indent:
+                transitions.append((curr_line, prev_indent, curr_indent))
+        return transitions
 
     def enter_block(self):
         """Called when entering a new block (function, loop, condition)."""
@@ -68,6 +88,7 @@ class IndentationTracker:
         self.max_indent_level = 0
         self.block_count = 0
         self.indent_history = []
+        self.line_indent_map = []
 
     @property
     def is_in_block(self) -> bool:

@@ -181,6 +181,8 @@ class BaseConverter(ABC):
         """
         Apply conversion rules to all lines.
 
+        Handles closing braces when indentation decreases.
+
         Args:
             parsed_lines: List of parsed lines
 
@@ -190,16 +192,21 @@ class BaseConverter(ABC):
         converted = []
         prev_indent = 0
 
-        for parsed_line in parsed_lines:
-            # Handle closing braces for indentation decrease
-            if self.target_lang in ["javascript", "java"]:
-                indent_decrease = max(0, prev_indent - parsed_line.indent_level)
-                for _ in range(indent_decrease):
-                    # Add closing brace from previous iteration
-                    if converted:
-                        # Insert brace on previous line if needed
-                        pass
+        for i, parsed_line in enumerate(parsed_lines):
+            curr_indent = parsed_line.indent_level
 
+            # Handle closing braces for indentation decrease (BEFORE adding the line)
+            if self.target_lang in ["javascript", "java"] and i > 0:
+                if curr_indent < prev_indent:
+                    # Indentation decreased - add closing braces
+                    indent_decrease = prev_indent - curr_indent
+                    for j in range(indent_decrease):
+                        # Calculate indentation level for closing brace
+                        closing_brace_indent_level = prev_indent - j - 1
+                        closing_indent = " " * (closing_brace_indent_level * 2)  # 2 spaces per level
+                        converted.append(closing_indent + "}")
+
+            # Convert the current line
             if parsed_line.construct_type in self.rules:
                 rules = self.rules[parsed_line.construct_type]
                 converted_line = self._apply_rules(parsed_line, rules)
@@ -207,7 +214,16 @@ class BaseConverter(ABC):
                 converted_line = self._convert_generic_line(parsed_line)
 
             converted.append(converted_line)
-            prev_indent = parsed_line.indent_level
+            prev_indent = curr_indent
+
+        # Handle closing braces at end of file
+        # If the last line still has indentation, we need to close those blocks
+        if self.target_lang in ["javascript", "java"] and len(parsed_lines) > 0:
+            last_indent = parsed_lines[-1].indent_level
+            # Close remaining open blocks from the last indentation level
+            for indent_level in range(last_indent - 1, -1, -1):
+                closing_indent = " " * (indent_level * 2)
+                converted.append(closing_indent + "}")
 
         return converted
 

@@ -158,8 +158,8 @@ class ElifCondition(Rule):
         if match:
             condition = match.group(1)
             condition = self._convert_condition(condition)
-            # Note: we close previous block and open new one
-            converted = f"{indent}}} else if ({condition}) {{"
+            # Note: indentation decrease logic adds closing brace, so we only add "else if"
+            converted = f"{indent}else if ({condition}) {{"
             return {
                 "success": True,
                 "converted_line": converted,
@@ -194,7 +194,8 @@ class ElseCondition(Rule):
 
     def convert(self, parsed_line: ParsedLine, tracker: IndentationTracker, warnings) -> Dict:
         indent = parsed_line.get_target_indent("javascript")
-        converted = f"{indent}}} else {{"
+        # Note: indentation decrease logic adds closing brace, so we only add "else {"
+        converted = f"{indent}else {{"
         tracker.enter_block()
         return {
             "success": True,
@@ -385,7 +386,8 @@ class ExceptClause(Rule):
             exc_type = match.group(1)
             var_name = match.group(2)
             # In JS, catch receives error object
-            converted = f"{indent}}} catch ({var_name}) {{"
+            # Note: indentation decrease logic adds closing brace
+            converted = f"{indent}catch ({var_name}) {{"
             tracker.enter_block()
             return {
                 "success": True,
@@ -396,7 +398,8 @@ class ExceptClause(Rule):
         # except ExceptionType:
         match = re.search(r"^\s*except\s+(\w+)\s*:\s*$", line)
         if match:
-            converted = f"{indent}}} catch (error) {{"
+            # Note: indentation decrease logic adds closing brace
+            converted = f"{indent}catch (error) {{"
             tracker.enter_block()
             return {
                 "success": True,
@@ -407,7 +410,8 @@ class ExceptClause(Rule):
         # except:
         match = re.search(r"^\s*except\s*:\s*$", line)
         if match:
-            converted = f"{indent}}} catch (error) {{"
+            # Note: indentation decrease logic adds closing brace
+            converted = f"{indent}catch (error) {{"
             tracker.enter_block()
             return {
                 "success": True,
