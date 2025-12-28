@@ -293,6 +293,9 @@
                 <span>Upload</span>
               </label>
             </div>
+            <div id="detectedLanguageDisplay" class="text-xs text-gray-400 mt-2 hidden">
+              Detected language: <span id="detectedLanguageName" class="text-purple-400 font-semibold"></span>
+            </div>
           </div>
 
           <!-- Source Editor with Syntax Highlighting -->
@@ -649,6 +652,9 @@
       setupSyntaxHighlighting();
     });
 
+    // Auto-detection debounce
+    let detectionTimeout;
+
     // Syntax highlighting functions
     function setupSyntaxHighlighting() {
       const sourceCode = document.getElementById('sourceCode');
@@ -656,8 +662,20 @@
       const sourceHighlight = document.getElementById('sourceHighlight');
       const outputHighlight = document.getElementById('outputHighlight');
 
-      // Update highlighting on input
-      sourceCode.addEventListener('input', () => updateSourceHighlight());
+      // Update highlighting on input and trigger auto-detection
+      sourceCode.addEventListener('input', () => {
+        updateSourceHighlight();
+
+        // Auto-detect language with debouncing
+        clearTimeout(detectionTimeout);
+        if (sourceCode.value.trim() && !document.getElementById('fromLanguage').value) {
+          detectionTimeout = setTimeout(() => {
+            autoDetectLanguage();
+          }, 500);
+        } else if (!sourceCode.value.trim()) {
+          document.getElementById('detectedLanguageDisplay').classList.add('hidden');
+        }
+      });
 
       // Sync scroll between textarea and highlight layer
       sourceCode.addEventListener('scroll', () => {
@@ -670,8 +688,34 @@
       });
 
       // Update language on selection change
-      document.getElementById('fromLanguage').addEventListener('change', updateSourceHighlight);
+      document.getElementById('fromLanguage').addEventListener('change', () => {
+        updateSourceHighlight();
+        document.getElementById('detectedLanguageDisplay').classList.add('hidden');
+      });
       document.getElementById('toLanguage').addEventListener('change', updateOutputHighlight);
+    }
+
+    // Auto-detect language function
+    async function autoDetectLanguage() {
+      const code = document.getElementById('sourceCode').value;
+      if (!code.trim()) return;
+
+      try {
+        const response = await fetch('http://localhost:8000/detect-language', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+
+        const data = await response.json();
+        if (data.detected_language && data.detected_language !== 'unknown') {
+          // Show detected language without auto-filling
+          document.getElementById('detectedLanguageName').textContent = data.detected_language;
+          document.getElementById('detectedLanguageDisplay').classList.remove('hidden');
+        }
+      } catch (error) {
+        console.error('Error auto-detecting language:', error);
+      }
     }
 
     function updateSourceHighlight() {
@@ -894,7 +938,7 @@
       if (!code.trim()) return null;
 
       try {
-        const response = await fetch("/detect-language", {
+        const response = await fetch("http://localhost:8000/detect-language", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code })
@@ -946,7 +990,7 @@
       const startTime = performance.now();
 
       try {
-        const response = await fetch("/convert", {
+        const response = await fetch("http://localhost:8000/convert", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
