@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from api.models import DetectRequest, DetectResponse, ConvertRequest, ConvertResponse
 from core.language_detector import LanguageDetector
 from core.conversion_engine import ConversionEngine
+import os
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -90,3 +92,8 @@ def convert_code(req: ConvertRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Conversion error: {str(e)}")
+
+
+# Serve frontend
+frontend_path = os.path.join(os.path.dirname(__file__), "..")
+app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
