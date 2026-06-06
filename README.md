@@ -90,7 +90,3 @@ code-convertor/
     ├── utils/
     └── tests/
 ```
-
-## License
-
-Released under the MIT License. See the `LICENSE` reference in the project for details.
