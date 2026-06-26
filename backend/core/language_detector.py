@@ -1,13 +1,18 @@
 import re
+import os
+import json
 from typing import Dict, Tuple, List
 from api.models import DetectResponse
 
 
 class LanguageDetector:
-    """Enhanced language detection with confidence scoring."""
+    """Enhanced language detection with confidence scoring. Uses Groq API when available."""
 
     def __init__(self):
         """Initialize detector with language-specific patterns and weights."""
+        self._groq_client = None
+        self._groq_available = False
+        self._init_groq()
         self.patterns = {
             "python": {
                 r"\bdef\s+\w+\s*\(": 1.0,  # def function_name(
@@ -78,9 +83,20 @@ class LanguageDetector:
             }
         }
 
+    def _init_groq(self):
+        """Try to initialize Groq client for AI-powered detection."""
+        api_key = os.environ.get("GROQ_API_KEY")
+        if api_key:
+            try:
+                from groq import Groq
+                self._groq_client = Groq(api_key=api_key)
+                self._groq_available = True
+            except ImportError:
+                pass
+
     def detect(self, code: str) -> DetectResponse:
         """
-        Detect language and return confidence scores with explanation.
+        Detect language using Groq API (preferred) or regex fallback.
 
         Args:
             code: Source code to analyze
@@ -96,6 +112,67 @@ class LanguageDetector:
                 alternatives=[]
             )
 
+        # Try Groq AI detection first
+        if self._groq_available:
+            try:
+                result = self._detect_with_groq(code)
+                if result and result.detected_language != "unknown":
+                    return result
+            except Exception:
+                pass
+
+        # Fallback to regex-based detection
+        return self._detect_with_regex(code)
+
+    def _detect_with_groq(self, code: str) -> DetectResponse:
+        """Detect language using Groq LLM API."""
+        prompt = (
+            "Detect the programming language of this code. "
+            "Respond ONLY with JSON, no other text.\n"
+            '{{"language": "<language_name>", "confidence": <0.0-1.0>, "reason": "<brief explanation>"}}\n\n'
+            "Supported languages: python, javascript, java, typescript, cpp, csharp, go, rust, ruby, php\n"
+            "Use lowercase for the language name.\n\n"
+            f"Code:\n```\n{code[:2000]}\n```"
+        )
+
+        response = self._groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
+            temperature=0.1
+        )
+
+        result_text = response.choices[0].message.content.strip()
+
+        # Handle potential markdown code blocks
+        if "```json" in result_text:
+            result_text = result_text.split("```json")[1].split("```")[0]
+        elif "```" in result_text:
+            result_text = result_text.split("```")[1].split("```")[0]
+
+        result_json = json.loads(result_text)
+        lang = result_json.get("language", "unknown").lower().strip()
+        conf = float(result_json.get("confidence", 0.5))
+        reason = result_json.get("reason", "Detected by AI")
+
+        # Validate the language is one we support
+        supported = {"python", "javascript", "java", "typescript", "cpp", "csharp", "go", "rust", "ruby", "php"}
+        if lang not in supported:
+            return None
+
+        # Get regex-based alternatives
+        regex_result = self._detect_with_regex(code)
+        alternatives = regex_result.alternatives
+
+        return DetectResponse(
+            detected_language=lang,
+            confidence=min(max(conf, 0.0), 1.0),
+            reason=f"[AI] {reason}",
+            alternatives=alternatives
+        )
+
+    def _detect_with_regex(self, code: str) -> DetectResponse:
+        """Detect language using regex pattern matching (fallback)."""
         scores = {}
         for lang, patterns in self.patterns.items():
             score = self._calculate_language_score(code, lang, patterns)
@@ -106,7 +183,7 @@ class LanguageDetector:
         top_lang, top_score = sorted_langs[0]
 
         # Normalize confidence (max possible score is roughly 15-20)
-        confidence = min(top_score / 10.0, 1.0)  # Changed from 15 to 10 for better scaling
+        confidence = min(top_score / 10.0, 1.0)
 
         # Return unknown only if no language has any matches
         if top_score == 0:
@@ -114,15 +191,13 @@ class LanguageDetector:
             confidence = 0.0
             reason = "Could not detect language - no matching patterns found"
         else:
-            # Always return the top language, even if confidence is low
-            # Confidence just indicates strength of the match
             reason = self._generate_detection_reason(code, top_lang)
 
         # Build alternatives list
         alternatives = []
         for lang, score in sorted_langs[1:]:
             alt_confidence = min(score / 10.0, 1.0)
-            if score > 0:  # Include any language with matches
+            if score > 0:
                 alternatives.append((lang, alt_confidence))
 
         return DetectResponse(
