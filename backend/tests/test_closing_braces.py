@@ -83,7 +83,7 @@ def test_for_loop_closing_brace():
     result = converter.convert(code)
 
     assert "for (let i = 0" in result.converted_code, "For loop not converted"
-    assert "}" in result.converted_code, "Missing closing brace for loop"
+    assert "}" in result.converted_code, "Missing closing brace loop"
 
     opening_count = result.converted_code.count("{")
     closing_count = result.converted_code.count("}")
