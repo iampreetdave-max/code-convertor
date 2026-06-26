@@ -3,6 +3,7 @@ from api.models import ConvertResponse
 from core.language_detector import LanguageDetector
 from converters.python_to_javascript import PythonToJavaScriptConverter
 from converters.javascript_to_python import JavaScriptToPythonConverter
+from converters.python_to_java import PythonToJavaConverter
 
 
 class ConversionEngine:
@@ -14,9 +15,7 @@ class ConversionEngine:
         self.converters: Dict[tuple, type] = {
             ("python", "javascript"): PythonToJavaScriptConverter,
             ("javascript", "python"): JavaScriptToPythonConverter,
-            # Future pairs can be added here
-            # ("python", "java"): PythonToJavaConverter,
-            # etc.
+            ("python", "java"): PythonToJavaConverter,
         }
 
     def convert(
@@ -71,7 +70,7 @@ class ConversionEngine:
         # Check if conversion is supported
         key = (source_language.lower(), target_language.lower())
         if key not in self.converters:
-            supported_pairs = ", ".join([f"{s}→{t}" for s, t in self.converters.keys()])
+            supported_pairs = ", ".join([f"{s} -> {t}" for s, t in self.converters.keys()])
             raise ValueError(
                 f"Conversion from {source_language} to {target_language} is not yet supported. "
                 f"Supported pairs: {supported_pairs}"
@@ -114,7 +113,7 @@ class ConversionEngine:
 
     def get_supported_pairs(self) -> list:
         """Get list of supported language pairs."""
-        return [f"{s}→{t}" for s, t in self.converters.keys()]
+        return [f"{s} -> {t}" for s, t in self.converters.keys()]
 
     def detect_and_convert(
         self,
