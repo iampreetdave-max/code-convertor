@@ -94,11 +94,12 @@ class TestConvert:
         assert "No code provided" in res.warnings
 
     def test_no_key_no_fn_fallback(self, monkeypatch):
-        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        for k in ("GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEYS"):
+            monkeypatch.delenv(k, raising=False)
         conv = LLMConverter("java", "typescript")  # no completion_fn, no key
         res = conv.convert("class A {}")
         assert res.conversion_confidence == 0.0
-        assert any("GROQ_API_KEY" in w for w in res.warnings)
+        assert any("GROQ" in w for w in res.warnings)
 
     def test_llm_error_fallback(self):
         def boom(system, user, max_tokens):
@@ -207,6 +208,70 @@ class TestCompleteness:
         res = conv.convert("def alpha(x): return x")
         assert any("truncat" in w.lower() for w in res.warnings)
         assert res.conversion_confidence <= 0.4
+
+
+# ---------------------------------------------------------------------------
+# Multi-key rotation + failover (3-key safety net)
+# ---------------------------------------------------------------------------
+
+class TestMultiKey:
+    @pytest.fixture(autouse=True)
+    def _clear_keys(self, monkeypatch):
+        for k in ("GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3",
+                  "GROQ_API_KEY_4", "GROQ_API_KEYS"):
+            monkeypatch.delenv(k, raising=False)
+
+    def test_collect_keys_dedupe_and_order(self, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "a")
+        monkeypatch.setenv("GROQ_API_KEY_2", "b")
+        monkeypatch.setenv("GROQ_API_KEYS", "c, a")  # 'a' duplicates the primary
+        assert LLMConverter._collect_keys() == ["a", "b", "c"]
+        assert LLMConverter._collect_keys("z")[0] == "z"  # explicit arg wins first slot
+
+    def test_rotation_spreads_start(self, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "k1")
+        monkeypatch.setenv("GROQ_API_KEY_2", "k2")
+        monkeypatch.setenv("GROQ_API_KEY_3", "k3")
+        conv = LLMConverter("python", "javascript")
+        LLMConverter._key_cursor = 0
+        starts = [conv._rotated_keys()[0] for _ in range(3)]
+        assert set(starts) == {"k1", "k2", "k3"}  # each key leads once
+
+    def test_failover_to_next_key(self, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "k1")
+        monkeypatch.setenv("GROQ_API_KEY_2", "k2")
+        LLMConverter._key_cursor = 0
+        conv = LLMConverter("python", "javascript")
+        tried = []
+
+        class RateLimitError(Exception):
+            pass
+
+        def fake(key, system, user, mt):
+            tried.append(key)
+            if key == "k1":
+                raise RateLimitError("429 rate limit")
+            return "```javascript\nlet x = 1;\n```"
+        monkeypatch.setattr(conv, "_call_key", fake)
+        out = conv._complete("sys", "usr", 100)
+        assert "let x = 1" in out
+        assert tried == ["k1", "k2"]  # transparently failed over
+
+    def test_all_keys_rate_limited_raises(self, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "k1")
+        monkeypatch.setenv("GROQ_API_KEY_2", "k2")
+        LLMConverter._key_cursor = 0
+        conv = LLMConverter("python", "javascript")
+
+        class RateLimitError(Exception):
+            pass
+
+        def boom(*a):
+            raise RateLimitError("429")
+        monkeypatch.setattr(conv, "_call_key", boom)
+        monkeypatch.setattr(conv, "_retry_wait", lambda e, a: 0)  # no real sleep
+        with pytest.raises(RateLimitError):
+            conv._complete("s", "u", 10)  # exhausts pool -> engine falls back
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,3 @@
-import os
 from typing import Dict, List
 from api.models import ConvertResponse
 from core.language_detector import LanguageDetector
@@ -65,9 +64,9 @@ class ConversionEngine:
                 f"Targets: {', '.join(self.TARGET_LANGUAGES)}."
             )
 
-        # Was the LLM actually configured? (If no key, rule-based is the normal
-        # path and shouldn't be flagged as a degraded fallback.)
-        llm_attempted = bool(os.environ.get("GROQ_API_KEY"))
+        # Was the LLM actually configured? (Any of the rotated Groq keys counts.
+        # If none, rule-based is the normal path, not a degraded fallback.)
+        llm_attempted = bool(LLMConverter._collect_keys())
 
         # 1) Try the LLM (idiomatic output for any pair).
         llm_result = None

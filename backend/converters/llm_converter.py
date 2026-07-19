@@ -125,6 +125,11 @@ class LLMConverter:
     LARGE_FILE_MAX_TOKENS = 16384
     EXTRA_LARGE_FILE_MAX_TOKENS = 32768
 
+    # Multi-key rotation + failover: each free Groq key has its own tokens/min
+    # budget, so N keys ~= Nx headroom AND a live key survives one going down.
+    _CLIENTS: dict = {}   # key -> Groq client (cached)
+    _key_cursor = 0       # class-level round-robin start, spreads load across keys
+
     def __init__(
         self,
         source_lang: str,
@@ -145,10 +150,10 @@ class LLMConverter:
         self.target_lang = target_lang.lower()
         # Any pair is allowed: specialized prompt if we have one, else a generic
         # translator prompt (LLMs handle mainstream languages in any direction).
-        self.api_key = api_key or os.environ.get("GROQ_API_KEY")
+        self._keys = self._collect_keys(api_key)
+        self.api_key = self._keys[0] if self._keys else None  # back-compat
         self.model = model
         self._completion_fn = completion_fn
-        self._client = None
         self._confidence = ConfidenceCalculator()
         self._last_finish_reason = None  # set by _complete on the real API path
 
@@ -157,11 +162,11 @@ class LLMConverter:
         if not code.strip():
             return self._response("", 1.0, ["No code provided"], [], level=3, extra={})
 
-        if self._completion_fn is None and not self.api_key:
+        if self._completion_fn is None and not self._keys:
             return self._fallback(
                 code,
-                "GROQ_API_KEY not set. Add a valid key to the environment "
-                "(the one in .env is revoked), or pass api_key/completion_fn.",
+                "No GROQ API key set. Add GROQ_API_KEY (and optionally "
+                "GROQ_API_KEY_2/3 for more headroom) to the environment.",
             )
 
         system = self._prompt_for(self.source_lang, self.target_lang)
@@ -244,27 +249,79 @@ class LLMConverter:
         """
         if self._completion_fn is not None:
             return self._completion_fn(system, user, max_tokens)
-        client = self._get_client()
+        keys = self._rotated_keys()
+        if not keys:
+            raise RuntimeError("No GROQ API key configured.")
         last_err = None
-        for attempt in range(3):
+        # Two passes over the key pool: a rate-limited or dead key is skipped and
+        # the next key tried immediately; a brief backoff separates the two passes.
+        for pass_i in range(2):
+            for key in keys:
+                try:
+                    return self._call_key(key, system, user, max_tokens)
+                except Exception as e:
+                    last_err = e
+                    if self._is_transient(e) or self._is_auth(e):
+                        continue          # this key is rate-limited/bad -> next key
+                    raise                 # genuine error (bad request) -> surface it
+            if pass_i == 0:
+                time.sleep(self._retry_wait(last_err, 0))
+        raise last_err
+
+    def _call_key(self, key: str, system: str, user: str, max_tokens: int) -> str:
+        resp = self._client_for(key).chat.completions.create(
+            model=self.model,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": user}],
+            temperature=0.1,
+            max_tokens=max_tokens,
+        )
+        choice = resp.choices[0]
+        self._last_finish_reason = getattr(choice, "finish_reason", None)
+        return choice.message.content or ""
+
+    @staticmethod
+    def _collect_keys(explicit: Optional[str] = None) -> list:
+        """All configured Groq keys: explicit arg, GROQ_API_KEY, GROQ_API_KEY_2..7,
+        and a comma-separated GROQ_API_KEYS. De-duped, order preserved."""
+        raw = [explicit, os.environ.get("GROQ_API_KEY")]
+        raw += [os.environ.get(f"GROQ_API_KEY_{i}") for i in range(2, 8)]
+        csv = os.environ.get("GROQ_API_KEYS")
+        if csv:
+            raw += [p.strip() for p in csv.split(",")]
+        seen, out = set(), []
+        for k in raw:
+            if k and k not in seen:
+                seen.add(k)
+                out.append(k)
+        return out
+
+    def _rotated_keys(self) -> list:
+        """Round-robin the starting key each call so load spreads across keys."""
+        keys = self._keys
+        if not keys:
+            return []
+        start = LLMConverter._key_cursor % len(keys)
+        LLMConverter._key_cursor = (LLMConverter._key_cursor + 1) % 100000
+        return keys[start:] + keys[:start]
+
+    def _client_for(self, key: str):
+        client = LLMConverter._CLIENTS.get(key)
+        if client is None:
             try:
-                resp = client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "system", "content": system},
-                              {"role": "user", "content": user}],
-                    temperature=0.1,      # low for near-deterministic translation
-                    max_tokens=max_tokens,
-                )
-                choice = resp.choices[0]
-                self._last_finish_reason = getattr(choice, "finish_reason", None)
-                return choice.message.content or ""
-            except Exception as e:
-                last_err = e
-                if attempt < 2 and self._is_transient(e):
-                    time.sleep(self._retry_wait(e, attempt))
-                    continue
-                raise
-        raise last_err  # pragma: no cover
+                from groq import Groq
+            except ImportError:
+                raise ImportError("groq package required: pip install groq")
+            client = Groq(api_key=key, timeout=30.0, max_retries=0)
+            LLMConverter._CLIENTS[key] = client
+        return client
+
+    @staticmethod
+    def _is_auth(e: Exception) -> bool:
+        name = type(e).__name__
+        s = str(e)
+        return ("Authentication" in name or "Permission" in name
+                or " 401" in s or " 403" in s)
 
     @staticmethod
     def _is_transient(e: Exception) -> bool:
@@ -300,16 +357,6 @@ class LLMConverter:
         if "APITimeout" in name or "Timeout" in name or "APIConnection" in name:
             return "The AI service did not respond in time. Please try again."
         return f"AI service error ({name}). Please try again."
-
-    def _get_client(self):
-        if self._client is None:
-            try:
-                from groq import Groq
-            except ImportError:
-                raise ImportError("groq package required: pip install groq")
-            # max_retries=0: we handle retries in _complete; timeout caps hangs.
-            self._client = Groq(api_key=self.api_key, timeout=30.0, max_retries=0)
-        return self._client
 
     def _calculate_max_tokens(self, code: str) -> int:
         lines = len(code.splitlines())
