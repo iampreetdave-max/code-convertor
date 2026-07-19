@@ -119,6 +119,8 @@ class ConfidenceCalculator:
             return self._validate_python(code)
         if lang == "javascript":
             return self._validate_javascript(code)
+        if lang in ("typescript", "ts"):
+            return self._validate_typescript(code)
         if lang == "java":
             return self._validate_java(code)
         return None
@@ -152,6 +154,18 @@ class ConfidenceCalculator:
         return self._run_check(
             code, suffix=".js",
             argv=lambda path: [node, "--check", path],
+            timeout=self.JS_TIMEOUT,
+        )
+
+    def _validate_typescript(self, code: str) -> Optional[bool]:
+        tsc = self._tool("tsc")
+        if not tsc:
+            return None  # ponytail: `npm i -g typescript` to enable TS validation
+        # Note: tsc reports TYPE errors too, not only syntax; a standalone
+        # converted file may fail on unresolved imports. skipLibCheck limits noise.
+        return self._run_check(
+            code, suffix=".ts",
+            argv=lambda p: [tsc, "--noEmit", "--skipLibCheck", p],
             timeout=self.JS_TIMEOUT,
         )
 
