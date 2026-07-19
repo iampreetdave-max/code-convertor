@@ -120,11 +120,11 @@ class TestAPIEndpoints:
         assert response.status_code == 400
 
     def test_api_unsupported_language_pair(self):
-        """Test unsupported language pair handling"""
+        """Test unsupported language pair handling (a language we don't offer)."""
         response = client.post("/convert", json={
             "code": "print('test')",
             "source_language": "python",
-            "target_language": "rust"
+            "target_language": "cobol"
         })
         assert response.status_code in [400, 500]
 

@@ -129,9 +129,13 @@ class TestConvert:
         assert res.conversion_confidence <= 0.25
         assert any("failed syntax validation" in w.lower() for w in res.warnings)
 
-    def test_unsupported_pair_raises(self):
-        with pytest.raises(ValueError):
-            LLMConverter("cobol", "typescript")
+    def test_any_pair_allowed_generic_prompt(self):
+        # Any pair is allowed now; unknown ones use a generic translator prompt.
+        ts = "```rust\nfn main() {}\n// Conversion confidence: MEDIUM - approximated\n```"
+        conv = LLMConverter("cobol", "rust", completion_fn=fake_completion(ts))
+        res = conv.convert("DISPLAY 'HI'.")
+        assert res.target_language == "rust"
+        assert "fn main" in res.converted_code
 
 
 # ---------------------------------------------------------------------------
@@ -144,11 +148,16 @@ class TestEngineWiring:
         assert "java -> typescript" in pairs
         assert "html -> typescript" in pairs
 
-    def test_factory_builds_correct_converter(self):
-        factory = ConversionEngine().converters[("java", "typescript")]
-        conv = factory()  # partial() -> LLMConverter("java","typescript")
-        assert isinstance(conv, LLMConverter)
-        assert conv.source_lang == "java" and conv.target_lang == "typescript"
+    def test_engine_supports_pairs_and_has_fallbacks(self):
+        eng = ConversionEngine()
+        # LLM pairs are supported...
+        assert eng._is_supported("java", "typescript")
+        assert eng._is_supported("html", "typescript")
+        assert eng._is_supported("java", "python")   # was "undefined" before
+        # ...rule-based fallbacks still exist for the core pairs...
+        assert ("python", "javascript") in eng.rule_based
+        # ...and a language we don't offer is rejected.
+        assert not eng._is_supported("python", "cobol")
 
     def test_prompts_exist_for_both_pairs(self):
         assert ("java", "typescript") in PROMPTS

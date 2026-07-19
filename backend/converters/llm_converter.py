@@ -29,6 +29,13 @@ from utils.confidence_calculator import ConfidenceCalculator
 DEFAULT_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 _SHARED_TAIL = """
+## FIDELITY (CRITICAL)
+Translate the ENTIRE input faithfully - convert EVERY function, class, statement
+and declaration, one for one, in the same order. Do NOT summarize, merge,
+deduplicate, refactor, generalize, or omit anything, even if the input is long or
+repetitive. The output must contain an equivalent of every top-level item in the
+input. Never replace repeated code with a single generalized version.
+
 ## OUTPUT FORMAT
 Return ONLY the converted code inside a single ```{fence} code fence. No prose
 before or after. On the LAST line inside the fence add exactly:
@@ -81,6 +88,31 @@ PROMPTS = {
     ("html", "typescript"): _HTML_TO_TS_PROMPT,
 }
 
+# Readable language names for the generic prompt.
+_LANG_NAMES = {
+    "python": "Python", "javascript": "JavaScript", "typescript": "TypeScript",
+    "java": "Java", "html": "HTML", "cpp": "C++", "csharp": "C#", "c": "C",
+    "go": "Go", "rust": "Rust", "ruby": "Ruby", "php": "PHP", "kotlin": "Kotlin",
+    "swift": "Swift",
+}
+
+
+def _generic_prompt(source: str, target: str) -> str:
+    """A solid default prompt for any language pair without a specialized one."""
+    s = _LANG_NAMES.get(source, source)
+    t = _LANG_NAMES.get(target, target)
+    return f"""You are an expert polyglot code translator converting {s} to clean, idiomatic, CORRECT {t}.
+
+Translate SEMANTICS faithfully - produce code a professional {t} developer would actually write, not a literal token-by-token swap.
+
+## RULES
+- Map data structures, standard-library calls, and idioms to their natural {t} equivalents.
+- Preserve behavior exactly. Keep names/structure recognizable.
+- If the {s} input is a standalone script, emit a runnable {t} program (add the entry point / `main` / imports / class wrapper that {t} requires).
+- Where a {s} construct has no faithful {t} equivalent, translate the closest form and mark it with a `// TODO: verify` (or the {t} comment syntax) instead of silently guessing.
+- Do not invent APIs. Prefer the {t} standard library.
+""" + _SHARED_TAIL.format(fence=target)
+
 
 class LLMConverter:
     """Groq-backed LLM converter for a specific (source_lang, target_lang) pair."""
@@ -107,11 +139,8 @@ class LLMConverter:
         """
         self.source_lang = source_lang.lower()
         self.target_lang = target_lang.lower()
-        if (self.source_lang, self.target_lang) not in PROMPTS:
-            raise ValueError(
-                f"No LLM prompt for {self.source_lang} -> {self.target_lang}. "
-                f"Supported: {', '.join(f'{s}->{t}' for s, t in PROMPTS)}"
-            )
+        # Any pair is allowed: specialized prompt if we have one, else a generic
+        # translator prompt (LLMs handle mainstream languages in any direction).
         self.api_key = api_key or os.environ.get("GROQ_API_KEY")
         self.model = model
         self._completion_fn = completion_fn
@@ -130,7 +159,7 @@ class LLMConverter:
                 "(the one in .env is revoked), or pass api_key/completion_fn.",
             )
 
-        system = PROMPTS[(self.source_lang, self.target_lang)]
+        system = self._prompt_for(self.source_lang, self.target_lang)
         user = f"Convert this {self.source_lang} to {self.target_lang}:\n\n{code}"
         max_tokens = self._calculate_max_tokens(code)
 
@@ -180,6 +209,10 @@ class LLMConverter:
         )
 
     # --------------------------------------------------------------- internals
+    @staticmethod
+    def _prompt_for(source: str, target: str) -> str:
+        return PROMPTS.get((source, target)) or _generic_prompt(source, target)
+
     def _complete(self, system: str, user: str, max_tokens: int) -> str:
         """Isolated LLM call. Injected in tests; hits Groq in production."""
         if self._completion_fn is not None:
@@ -221,11 +254,10 @@ class LLMConverter:
 
     @staticmethod
     def _strip_confidence_marker(code: str) -> str:
-        """Remove the trailing `// Conversion confidence: ...` meta comment."""
-        kept = [
-            l for l in code.splitlines()
-            if not (l.strip().startswith("//") and "conversion confidence:" in l.lower())
-        ]
+        """Remove the `Conversion confidence: ...` meta line in any comment style
+        (//, #, --, /* */, <!-- -->), so it never leaks into the output."""
+        kept = [l for l in code.splitlines()
+                if "conversion confidence:" not in l.lower()]
         return "\n".join(kept).rstrip()
 
     @staticmethod
