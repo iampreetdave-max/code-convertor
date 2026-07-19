@@ -29,6 +29,13 @@ from utils.confidence_calculator import ConfidenceCalculator
 DEFAULT_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 _SHARED_TAIL = """
+## FIDELITY (CRITICAL)
+Translate the ENTIRE input faithfully - convert EVERY function, class, statement
+and declaration, one for one, in the same order. Do NOT summarize, merge,
+deduplicate, refactor, generalize, or omit anything, even if the input is long or
+repetitive. The output must contain an equivalent of every top-level item in the
+input. Never replace repeated code with a single generalized version.
+
 ## OUTPUT FORMAT
 Return ONLY the converted code inside a single ```{fence} code fence. No prose
 before or after. On the LAST line inside the fence add exactly:
