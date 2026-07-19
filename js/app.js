@@ -131,7 +131,7 @@
       if (!code.trim()) return;
 
       try {
-        const response = await fetch('https://onrender.com', {
+        const response = await fetch('https://code-convertor-j8gd.onrender.com', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code })
@@ -370,7 +370,7 @@
       if (!code.trim()) return null;
 
       try {
-        const response = await fetch("https://onrender.com", {
+        const response = await fetch("https://code-convertor-j8gd.onrender.com", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code })
@@ -422,7 +422,7 @@
       const startTime = performance.now();
 
       try {
-        const response = await fetch("https://onrender.com", {
+        const response = await fetch("https://code-convertor-j8gd.onrender.com", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -486,7 +486,7 @@
       content.innerHTML = '<p class="text-sm text-neutral-500 text-center py-4">Running AI validation...</p>';
 
       try {
-        const response = await fetch('https://onrender.com', {
+        const response = await fetch('https://code-convertor-j8gd.onrender.com', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
