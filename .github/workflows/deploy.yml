@@ -1,0 +1,33 @@
+name: Deploy to Render
+
+# Automatically redeploys the live backend whenever `main` changes, so main is
+# always live. The Render deploy-hook URL contains a secret key, so it is stored
+# as the GitHub Actions secret RENDER_DEPLOY_HOOK — the URL is never committed.
+#
+# Setup (one time):
+#   1. GitHub repo -> Settings -> Secrets and variables -> Actions -> New secret
+#      Name:  RENDER_DEPLOY_HOOK
+#      Value: the full Render deploy-hook URL (https://api.render.com/deploy/srv-...?key=...)
+#   2. In Render, set the service's branch to `main` and (optionally) turn its own
+#      Auto-Deploy off, so this workflow is the single source of deploys.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}   # allows a manual "Run workflow" from the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK secret is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "Triggering Render deploy for $GITHUB_SHA ..."
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
+          echo "Render deploy triggered."
