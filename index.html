@@ -1221,10 +1221,17 @@
         try { renderConversionReport(data, source, target); } catch (e) { console.error("report render failed:", e); }
         try { renderDiffView(code, data.converted_code); } catch (e) { console.error("diff render failed:", e); }
 
-        showToast(`Converted in ${conversionTime}s`);
-
-        // Run AI validation in background
-        runValidation(code, data.converted_code, target);
+        // Never leave a silent blank box — surface the reason (e.g. AI rate-limited).
+        if (!data.converted_code || !data.converted_code.trim()) {
+          const why = (data.warnings && data.warnings.length)
+            ? data.warnings[0] : "No output was produced — please try again.";
+          showToast(why, "error");
+        } else {
+          const usedFallback = data.metadata && data.metadata.method && data.metadata.method !== "llm";
+          showToast(usedFallback ? `Converted (fast fallback) in ${conversionTime}s` : `Converted in ${conversionTime}s`);
+          // Run AI validation in background (only when we have AI output).
+          if (!usedFallback) runValidation(code, data.converted_code, target);
+        }
       } catch (error) {
         console.error("Error converting code:", error);
         showToast("Error converting code. Check if backend is running.", "error");

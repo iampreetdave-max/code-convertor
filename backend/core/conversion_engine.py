@@ -1,3 +1,4 @@
+import os
 from typing import Dict, List
 from api.models import ConvertResponse
 from core.language_detector import LanguageDetector
@@ -64,11 +65,15 @@ class ConversionEngine:
                 f"Targets: {', '.join(self.TARGET_LANGUAGES)}."
             )
 
+        # Was the LLM actually configured? (If no key, rule-based is the normal
+        # path and shouldn't be flagged as a degraded fallback.)
+        llm_attempted = bool(os.environ.get("GROQ_API_KEY"))
+
         # 1) Try the LLM (idiomatic output for any pair).
         llm_result = None
         try:
             llm_result = LLMConverter(source, target).convert(code)
-        except Exception as e:
+        except Exception:
             llm_result = None  # network/import error -> try fallback below
 
         rule_cls = self.rule_based.get((source, target))
@@ -80,9 +85,15 @@ class ConversionEngine:
             result = llm_result
         elif rule_cls is not None:
             result = rule_cls().convert(code)
-            result.warnings.insert(
-                0, "AI conversion was unavailable; used the fast rule-based "
-                   "converter (lower fidelity - review the output).")
+            result.metadata["method"] = "rule-based"
+            if llm_attempted:
+                # LLM was configured but failed (rate-limit / error): downgrade
+                # honestly and explain why (carry the sanitized reason).
+                result.conversion_confidence = min(result.conversion_confidence, 0.5)
+                reason = (" (" + llm_result.warnings[0] + ")") if (llm_result and llm_result.warnings) else ""
+                result.warnings.insert(
+                    0, "AI conversion unavailable - used the fast rule-based "
+                       "converter; review the output." + reason)
         elif llm_result is not None:
             # No rule-based fallback: surface the LLM's fallback (carries the error).
             result = llm_result
