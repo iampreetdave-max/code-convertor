@@ -1,0 +1,36 @@
+# Render Blueprint (Infrastructure-as-Code) for the CodeTransform backend.
+#
+# For a NEW service: Render dashboard -> New + -> Blueprint -> pick this repo.
+# For the EXISTING manually-created service, just match these settings in its
+# dashboard (Branch, Root Directory, Build/Start commands, Health check, Env).
+#
+# The backend serves BOTH the API and the frontend (index.html) at the same
+# origin, so hitting the Render URL alone gives a fully working app.
+
+services:
+  - type: web
+    name: code-convertor-backend
+    runtime: python
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # $PORT is provided by Render; the app MUST bind to it (not a fixed port).
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    # Deploys are driven by the GitHub Action (.github/workflows/deploy.yml).
+    # If you'd rather use Render's native auto-deploy, set this to true and
+    # delete/disable the GitHub Action to avoid double deploys.
+    autoDeploy: false
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.10"
+      - key: CODECONV_COMPILE_CHECK
+        value: "1"           # tree-sitter validation runs; node/javac degrade gracefully if absent
+      # Secrets — set the real values in the Render dashboard, never in this file:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_API_KEY_2
+        sync: false
+      - key: GROQ_API_KEY_3
+        sync: false
