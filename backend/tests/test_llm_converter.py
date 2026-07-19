@@ -176,6 +176,40 @@ class TestResilience:
 
 
 # ---------------------------------------------------------------------------
+# Completeness guardrail: truncation + collapse detection
+# ---------------------------------------------------------------------------
+
+class TestCompleteness:
+    def test_surviving_fraction(self):
+        src = "def alpha(x):\n    pass\ndef beta(x):\n    pass\ndef gamma(x):\n    pass\ndef delta(x):\n    pass"
+        assert LLMConverter._surviving_fraction(src, "alpha beta gamma delta", "python") == 1.0
+        assert LLMConverter._surviving_fraction(src, "alpha", "python") == 0.25
+
+    def test_collapse_detected_and_capped(self):
+        src = ("def alpha(x):\n    return x\n\ndef beta(x):\n    return x\n\n"
+               "def gamma(x):\n    return x\n\ndef delta(x):\n    return x")
+        out = "```javascript\nfunction alpha(x){return x;}\n// Conversion confidence: HIGH\n```"
+        res = LLMConverter("python", "javascript", completion_fn=fake_completion(out)).convert(src)
+        assert any("incomplete" in w.lower() for w in res.warnings)
+        assert res.conversion_confidence <= 0.4
+
+    def test_faithful_not_flagged(self):
+        src = "def alpha(x):\n    return x\n\ndef beta(x):\n    return x\n\ndef gamma(x):\n    return x"
+        out = ("```javascript\nfunction alpha(x){return x;}\nfunction beta(x){return x;}\n"
+               "function gamma(x){return x;}\n```")
+        res = LLMConverter("python", "javascript", completion_fn=fake_completion(out)).convert(src)
+        assert not any("incomplete" in w.lower() for w in res.warnings)
+
+    def test_truncation_flagged_and_capped(self):
+        out = "```javascript\nfunction alpha(x){return x;}\n```"
+        conv = LLMConverter("python", "javascript", completion_fn=fake_completion(out))
+        conv._last_finish_reason = "length"      # simulate hitting the token cap
+        res = conv.convert("def alpha(x): return x")
+        assert any("truncat" in w.lower() for w in res.warnings)
+        assert res.conversion_confidence <= 0.4
+
+
+# ---------------------------------------------------------------------------
 # Engine wiring
 # ---------------------------------------------------------------------------
 

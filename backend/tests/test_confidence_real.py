@@ -33,6 +33,42 @@ def compile_check_on(monkeypatch):
 HAS_NODE = shutil.which("node") is not None
 needs_node = pytest.mark.skipif(not HAS_NODE, reason="node not installed")
 
+try:
+    import tree_sitter_language_pack  # noqa: F401
+    HAS_TS = True
+except Exception:
+    HAS_TS = False
+needs_ts = pytest.mark.skipif(not HAS_TS, reason="tree-sitter-language-pack not installed")
+
+
+@needs_ts
+class TestTreeSitterValidation:
+    """tree-sitter parse-check lights up TS/go/rust/cpp/etc. output validation."""
+
+    def test_valid_typescript(self):
+        assert ConfidenceCalculator._validate_treesitter(
+            "function f(x: number): number { return x + 1; }", "typescript") is True
+
+    def test_broken_typescript(self):
+        assert ConfidenceCalculator._validate_treesitter(
+            "function f(x: number): number { return x + ; }", "typescript") is False
+
+    def test_valid_go(self):
+        assert ConfidenceCalculator._validate_treesitter(
+            "package main\nfunc main() { println(\"hi\") }\n", "go") is True
+
+    def test_broken_rust(self):
+        assert ConfidenceCalculator._validate_treesitter(
+            "fn main() { let x = ; }", "rust") is False
+
+    def test_unknown_language_none(self):
+        assert ConfidenceCalculator._validate_treesitter("whatever", "klingon") is None
+
+    def test_via_validate_output_syntax(self, compile_check_on):
+        calc = ConfidenceCalculator()
+        assert calc.validate_output_syntax("package main\nfunc main() {}\n", "go") is True
+        assert calc.validate_output_syntax("fn main() { let x = ; }", "rust") is False
+
 
 # ---------------------------------------------------------------------------
 # Core: validate_output_syntax (Python target = stdlib ast, deterministic)
@@ -66,7 +102,8 @@ class TestValidateOutputSyntax:
 
     def test_unknown_language_none(self, compile_check_on):
         calc = ConfidenceCalculator()
-        assert calc.validate_output_syntax("anything", "ruby") is None
+        # cobol has no validator (not python/js/ts/java and not a tree-sitter grammar)
+        assert calc.validate_output_syntax("anything", "cobol") is None
 
     @needs_node
     def test_valid_javascript_true(self, compile_check_on):
