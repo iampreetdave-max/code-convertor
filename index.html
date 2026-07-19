@@ -320,7 +320,7 @@
                 <option value="php">PHP</option>
               </select>
               <label id="dropZone" class="drop-zone flex items-center gap-2 px-3 py-2 border border-dashed border-neutral-700 rounded-lg cursor-pointer hover:border-neutral-400 transition text-xs text-neutral-400">
-                <input type="file" id="fileInput" class="hidden" accept=".py,.js,.ts,.java,.cpp,.c,.cs,.go,.rs,.rb,.php,.txt" />
+                <input type="file" id="fileInput" class="hidden" accept=".py,.js,.ts,.java,.cpp,.c,.cs,.go,.rs,.rb,.php,.txt,.html,.htm,.class,.jar" />
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                 </svg>
@@ -726,6 +726,7 @@
       setupKeyboardShortcuts();
       setupLanguageBadges();
       setupSyntaxHighlighting();
+      loadSupportedPairs();
     });
 
     // Auto-detection debounce
@@ -767,6 +768,7 @@
       // Update language on selection change
       document.getElementById('fromLanguage').addEventListener('change', () => {
         updateSourceHighlight();
+        updateTargetOptions();
         document.getElementById('detectedLanguageDisplay').classList.add('hidden');
         // Opening the preview automatically when the user picks HTML source.
         if (document.getElementById('fromLanguage').value === 'html') {
@@ -803,6 +805,43 @@
         frame.classList.add('hidden');
         hint.classList.remove('hidden');
       }
+    }
+
+    // Build the language dropdowns from what the backend actually supports,
+    // so the UI never offers a pair that can't convert.
+    let supportedMap = null;  // source -> Set(targets)
+    async function loadSupportedPairs() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        supportedMap = new Map();
+        (data.supported_pairs || []).forEach(p => {
+          const [s, t] = p.split(' -> ');
+          if (!supportedMap.has(s)) supportedMap.set(s, new Set());
+          supportedMap.get(s).add(t);
+        });
+        const from = document.getElementById('fromLanguage');
+        const keep = from.value;
+        from.innerHTML = '<option value="">Auto-detect language</option>' +
+          [...supportedMap.keys()].map(s => `<option value="${s}">${languageNames[s] || s}</option>`).join('');
+        if ([...supportedMap.keys()].includes(keep)) from.value = keep;
+        updateTargetOptions();
+      } catch (e) {
+        console.error('Could not load supported pairs; keeping static list.', e);
+      }
+    }
+
+    function updateTargetOptions() {
+      if (!supportedMap) return;
+      const from = document.getElementById('fromLanguage').value;
+      const to = document.getElementById('toLanguage');
+      const keep = to.value;
+      const targets = (from && supportedMap.has(from))
+        ? [...supportedMap.get(from)]
+        : [...new Set([].concat(...[...supportedMap.values()].map(s => [...s])))];
+      to.innerHTML = '<option value="">Select target language</option>' +
+        targets.map(t => `<option value="${t}">${languageNames[t] || t}</option>`).join('');
+      if (targets.includes(keep)) to.value = keep;
     }
 
     // Auto-detect language function
@@ -996,6 +1035,11 @@
 
     function handleFile(file) {
       const extension = file.name.split('.').pop().toLowerCase();
+      // JVM bytecode -> decompile to Java (binary upload), not a text read.
+      if (extension === 'class' || extension === 'jar') {
+        decompileFile(file);
+        return;
+      }
       const language = extensionToLanguage[extension];
 
       const reader = new FileReader();
@@ -1010,6 +1054,35 @@
         updateSourceHighlight();
       };
       reader.readAsText(file);
+    }
+
+    // Decompile uploaded JVM bytecode (.class/.jar) to readable Java.
+    async function decompileFile(file) {
+      showToast(`Decompiling ${file.name}...`);
+      try {
+        const form = new FormData();
+        form.append('file', file);
+        const res = await fetch('/decompile', { method: 'POST', body: form });
+        if (!res.ok) {
+          let detail = `Decompile failed (${res.status})`;
+          try { const err = await res.json(); if (err && err.detail) detail = err.detail; } catch (_) {}
+          showToast(detail, 'error');
+          return;
+        }
+        const data = await res.json();
+        document.getElementById('sourceCode').value = `// ${file.name} — JVM bytecode (decompiled with CFR)`;
+        document.getElementById('fromLanguage').value = 'java';
+        updateSourceBadge(); updateSourceHighlight(); updateSourceLineCount();
+        updateTargetOptions();
+        document.getElementById('toLanguage').value = 'java';
+        document.getElementById('outputCode').value = data.source || '';
+        updateTargetBadge(); updateOutputHighlight(); updateOutputLineCount();
+        (data.warnings || []).forEach(w => console.warn('decompile:', w));
+        showToast(`Decompiled ${data.classes} class(es) from ${file.name}`);
+      } catch (e) {
+        console.error('decompile error', e);
+        showToast('Decompile error. Check if backend is running.', 'error');
+      }
     }
 
     // Line counters
@@ -1112,6 +1185,14 @@
           })
         });
 
+        // Surface real backend errors (e.g. unsupported pair) instead of "undefined".
+        if (!response.ok) {
+          let detail = `Server error (${response.status})`;
+          try { const err = await response.json(); if (err && err.detail) detail = err.detail; } catch (_) {}
+          showToast(detail, "error");
+          return;
+        }
+
         const data = await response.json();
         const endTime = performance.now();
         const conversionTime = ((endTime - startTime) / 1000).toFixed(2);
@@ -1120,7 +1201,7 @@
         data._conversionTime = conversionTime;
         lastConversionData = data;
 
-        document.getElementById("outputCode").value = data.converted_code;
+        document.getElementById("outputCode").value = data.converted_code || "";
         updateOutputLineCount();
         updateTargetBadge();
         updateOutputHighlight();
@@ -1135,11 +1216,10 @@
         // Add to history
         addToHistory(code, data.converted_code, source, target, data.conversion_confidence);
 
-        // Render comprehensive report
-        renderConversionReport(data, source, target);
-
-        // Render diff view
-        renderDiffView(code, data.converted_code);
+        // Render report/diff DEFENSIVELY - a rendering error (e.g. a CDN lib
+        // that failed to load) must NOT make a successful conversion look failed.
+        try { renderConversionReport(data, source, target); } catch (e) { console.error("report render failed:", e); }
+        try { renderDiffView(code, data.converted_code); } catch (e) { console.error("diff render failed:", e); }
 
         showToast(`Converted in ${conversionTime}s`);
 

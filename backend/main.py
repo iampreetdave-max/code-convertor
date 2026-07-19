@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from api.models import (
@@ -12,6 +12,7 @@ from core.language_detector import LanguageDetector
 from core.conversion_engine import ConversionEngine
 from core.code_validator import CodeValidator
 from core.report_generator import ReportGenerator
+from converters.bytecode_decompiler import decompile_bytecode, DecompileError
 import os
 
 # Initialize FastAPI app with increased limits for large code files
@@ -268,6 +269,23 @@ def convert_and_validate(req: ConvertAndValidateRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Conversion error: {str(e)}")
+
+
+@app.post("/decompile")
+async def decompile(file: UploadFile = File(...)):
+    """
+    Decompile an uploaded JVM .class or .jar back to Java source (via CFR).
+
+    Returns {"language": "java", "source", "classes", "warnings"}.
+    CFR only reads the bytecode; nothing is executed.
+    """
+    try:
+        data = await file.read()
+        return decompile_bytecode(data, file.filename or "input.class")
+    except DecompileError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Decompilation error: {str(e)}")
 
 
 # Serve the self-contained frontend at "/" ONLY.

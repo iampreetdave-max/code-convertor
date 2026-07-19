@@ -1,5 +1,4 @@
-from functools import partial
-from typing import Dict
+from typing import Dict, List
 from api.models import ConvertResponse
 from core.language_detector import LanguageDetector
 from converters.python_to_javascript import PythonToJavaScriptConverter
@@ -9,161 +8,130 @@ from converters.llm_converter import LLMConverter
 
 
 class ConversionEngine:
-    """Orchestrates code conversion between supported language pairs."""
+    """
+    Orchestrates code conversion between supported languages.
+
+    Strategy: prefer the LLM converter (idiomatic, correct output for ANY pair),
+    and fall back to the fast rule-based converters when the LLM is unavailable
+    (no API key / network error) for the three pairs that have one. This gives
+    good output by default and still works offline for the core pairs.
+    """
+
+    # Languages offered as a source / target. HTML is source-only.
+    SOURCE_LANGUAGES = ["python", "javascript", "typescript", "java", "html",
+                        "cpp", "csharp", "go", "rust", "ruby", "php"]
+    TARGET_LANGUAGES = ["python", "javascript", "typescript", "java",
+                        "cpp", "csharp", "go", "rust", "ruby", "php"]
 
     def __init__(self):
-        """Initialize the conversion engine with available converters."""
         self.detector = LanguageDetector()
-        # Values are zero-arg factories that build a converter instance.
-        # LLM pairs use partial() to bind the (source, target) the class needs.
-        self.converters: Dict[tuple, type] = {
+        # Offline fallbacks for the pairs that have a rule-based converter.
+        self.rule_based: Dict[tuple, type] = {
             ("python", "javascript"): PythonToJavaScriptConverter,
             ("javascript", "python"): JavaScriptToPythonConverter,
             ("python", "java"): PythonToJavaConverter,
-            ("java", "typescript"): partial(LLMConverter, "java", "typescript"),
-            ("html", "typescript"): partial(LLMConverter, "html", "typescript"),
         }
+
+    def _is_supported(self, source: str, target: str) -> bool:
+        return (source in self.SOURCE_LANGUAGES
+                and target in self.TARGET_LANGUAGES
+                and source != target)
 
     def convert(
         self,
         code: str,
         source_language: str,
         target_language: str,
-        strict_mode: bool = False
+        strict_mode: bool = False,
     ) -> ConvertResponse:
-        """
-        Convert code from source language to target language.
+        source = (source_language or "").lower()
+        target = (target_language or "").lower()
 
-        Args:
-            code: Source code to convert
-            source_language: Source language (e.g., "python")
-            target_language: Target language (e.g., "javascript")
-            strict_mode: If True, fail on unsupported constructs; if False, best-effort
-
-        Returns:
-            ConvertResponse with converted code and metadata
-
-        Raises:
-            ValueError: If language pair is not supported or invalid
-        """
-        # Validate inputs
         if not code.strip():
-            return ConvertResponse(
-                converted_code="",
-                source_language=source_language,
-                target_language=target_language,
-                conversion_confidence=1.0,
-                warnings=["No code provided"],
-                unsupported_constructs=[],
-                unsupported_lines_count=0,
-                conversion_level=1,
-                metadata={}
-            )
+            return self._basic(code="", source=source, target=target,
+                               confidence=1.0, warnings=["No code provided"])
 
-        if source_language == target_language:
-            return ConvertResponse(
-                converted_code=code,
-                source_language=source_language,
-                target_language=target_language,
-                conversion_confidence=1.0,
-                warnings=["Source and target languages are the same"],
-                unsupported_constructs=[],
-                unsupported_lines_count=0,
-                conversion_level=0,
-                metadata={"lines_processed": len(code.split("\n"))}
-            )
+        if source == target:
+            return self._basic(code=code, source=source, target=target,
+                               confidence=1.0,
+                               warnings=["Source and target languages are the same"],
+                               level=0)
 
-        # Check if conversion is supported
-        key = (source_language.lower(), target_language.lower())
-        if key not in self.converters:
-            supported_pairs = ", ".join([f"{s} -> {t}" for s, t in self.converters.keys()])
+        if not self._is_supported(source, target):
             raise ValueError(
-                f"Conversion from {source_language} to {target_language} is not yet supported. "
-                f"Supported pairs: {supported_pairs}"
+                f"Conversion from {source_language} to {target_language} is not supported. "
+                f"Sources: {', '.join(self.SOURCE_LANGUAGES)}. "
+                f"Targets: {', '.join(self.TARGET_LANGUAGES)}."
             )
 
-        # Get appropriate converter
-        converter_class = self.converters[key]
-        converter = converter_class()
-
-        # Perform conversion
+        # 1) Try the LLM (idiomatic output for any pair).
+        llm_result = None
         try:
-            result = converter.convert(code)
-
-            # In strict mode, fail if unsupported constructs found
-            if strict_mode and result.unsupported_lines_count > 0:
-                result.warnings.insert(
-                    0,
-                    f"STRICT MODE: Found {result.unsupported_lines_count} unsupported constructs. "
-                    f"Conversion aborted. Review unsupported_constructs for details."
-                )
-
-            return result
-
+            llm_result = LLMConverter(source, target).convert(code)
         except Exception as e:
-            # Return best-effort response with error
-            return ConvertResponse(
-                converted_code=code,  # Return original as fallback
-                source_language=source_language,
-                target_language=target_language,
-                conversion_confidence=0.0,
-                warnings=[f"Conversion error: {str(e)}", "Returned original code"],
-                unsupported_constructs=[],
-                unsupported_lines_count=0,
-                conversion_level=0,
-                metadata={
-                    "error": str(e),
-                    "lines_processed": len(code.split("\n"))
-                }
-            )
+            llm_result = None  # network/import error -> try fallback below
 
-    def get_supported_pairs(self) -> list:
-        """Get list of supported language pairs."""
-        return [f"{s} -> {t}" for s, t in self.converters.keys()]
+        rule_cls = self.rule_based.get((source, target))
+        llm_ok = (llm_result is not None
+                  and llm_result.conversion_confidence > 0
+                  and llm_result.converted_code.strip())
 
-    def detect_and_convert(
-        self,
-        code: str,
-        target_language: str,
-        strict_mode: bool = False
-    ) -> Dict:
-        """
-        Detect source language and convert to target in one call.
+        if llm_ok:
+            result = llm_result
+        elif rule_cls is not None:
+            result = rule_cls().convert(code)
+            result.warnings.insert(
+                0, "AI conversion was unavailable; used the fast rule-based "
+                   "converter (lower fidelity - review the output).")
+        elif llm_result is not None:
+            # No rule-based fallback: surface the LLM's fallback (carries the error).
+            result = llm_result
+        else:
+            return self._basic(
+                code=code, source=source, target=target, confidence=0.0, level=0,
+                warnings=["Conversion failed and no fallback is available."])
 
-        Args:
-            code: Source code
-            target_language: Target language
-            strict_mode: If True, fail on unsupported constructs
+        if strict_mode and result.unsupported_lines_count > 0:
+            result.warnings.insert(
+                0, f"STRICT MODE: Found {result.unsupported_lines_count} unsupported "
+                   f"constructs. Review unsupported_constructs for details.")
+        return result
 
-        Returns:
-            Dict with detection_result and conversion_result
-        """
+    def get_supported_pairs(self) -> List[str]:
+        """All offered pairs, as 'source -> target' strings (HTML is source-only)."""
+        return [f"{s} -> {t}"
+                for s in self.SOURCE_LANGUAGES
+                for t in self.TARGET_LANGUAGES
+                if s != t]
+
+    def get_supported_languages(self) -> Dict[str, List[str]]:
+        return {"sources": self.SOURCE_LANGUAGES, "targets": self.TARGET_LANGUAGES}
+
+    def detect_and_convert(self, code: str, target_language: str,
+                           strict_mode: bool = False) -> Dict:
         detection = self.detector.detect(code)
-
         if detection.detected_language == "unknown":
             return {
                 "detection": detection,
-                "conversion": ConvertResponse(
-                    converted_code="",
-                    source_language="unknown",
-                    target_language=target_language,
-                    conversion_confidence=0.0,
-                    warnings=["Could not detect source language"],
-                    unsupported_constructs=[],
-                    unsupported_lines_count=0,
-                    conversion_level=0,
-                    metadata={}
-                )
+                "conversion": self._basic(
+                    code="", source="unknown", target=target_language,
+                    confidence=0.0, level=0,
+                    warnings=["Could not detect source language"]),
             }
+        conversion = self.convert(code, detection.detected_language,
+                                  target_language, strict_mode=strict_mode)
+        return {"detection": detection, "conversion": conversion}
 
-        conversion = self.convert(
-            code,
-            detection.detected_language,
-            target_language,
-            strict_mode=strict_mode
+    # ----------------------------------------------------------------- helpers
+    def _basic(self, code, source, target, confidence, warnings=None, level=1) -> ConvertResponse:
+        return ConvertResponse(
+            converted_code=code,
+            source_language=source,
+            target_language=target,
+            conversion_confidence=confidence,
+            warnings=warnings or [],
+            unsupported_constructs=[],
+            unsupported_lines_count=0,
+            conversion_level=level,
+            metadata={"lines_processed": len(code.split("\n")) if code else 0},
         )
-
-        return {
-            "detection": detection,
-            "conversion": conversion
-        }
