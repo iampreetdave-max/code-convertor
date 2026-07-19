@@ -102,11 +102,13 @@ class TestConvert:
 
     def test_llm_error_fallback(self):
         def boom(system, user, max_tokens):
-            raise RuntimeError("rate limited")
+            raise RuntimeError("some raw internal vendor detail")
         conv = LLMConverter("java", "typescript", completion_fn=boom)
         res = conv.convert("class A {}")
         assert res.conversion_confidence == 0.0
-        assert any("rate limited" in w for w in res.warnings)
+        joined = " ".join(res.warnings).lower()
+        assert "unavailable" in joined or "try again" in joined   # friendly message
+        assert "some raw internal vendor detail" not in joined     # sanitized, no leak
 
     def test_empty_llm_output_fallback(self):
         conv = LLMConverter("java", "typescript", completion_fn=fake_completion("```\n\n```"))
@@ -136,6 +138,41 @@ class TestConvert:
         res = conv.convert("DISPLAY 'HI'.")
         assert res.target_language == "rust"
         assert "fn main" in res.converted_code
+
+
+# ---------------------------------------------------------------------------
+# Resilience: rate-limit handling + error sanitization (no vendor leak)
+# ---------------------------------------------------------------------------
+
+class TestResilience:
+    def test_is_transient(self):
+        class RateLimitError(Exception):
+            pass
+        assert LLMConverter._is_transient(RateLimitError("x"))
+        assert LLMConverter._is_transient(Exception("got 503 from upstream"))
+        assert not LLMConverter._is_transient(ValueError("bad prompt"))
+
+    def test_friendly_error_no_vendor_leak(self):
+        class RateLimitError(Exception):
+            pass
+        e = RateLimitError("Error code: 429 - organization org_01kfxxx ... "
+                           "Upgrade at https://console.groq.com/settings/billing")
+        msg = LLMConverter._friendly_error(e)
+        assert "org_" not in msg and "http" not in msg and "groq.com" not in msg
+        assert "rate-limited" in msg.lower()
+
+    def test_convert_rate_limit_falls_back_sanitized(self):
+        class RateLimitError(Exception):
+            pass
+
+        def boom(system, user, mt):
+            raise RateLimitError("429 organization org_01kfxxx "
+                                 "https://console.groq.com/settings/billing")
+        res = LLMConverter("java", "python", completion_fn=boom).convert("x();")
+        assert res.conversion_confidence == 0.0          # graceful, not a crash
+        joined = " ".join(res.warnings)
+        assert "org_" not in joined and "groq.com" not in joined and "http" not in joined
+        assert "rate-limited" in joined.lower()
 
 
 # ---------------------------------------------------------------------------

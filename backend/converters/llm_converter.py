@@ -20,6 +20,7 @@ add when inputs actually exceed the model context, not before.
 
 import os
 import re
+import time
 from typing import Callable, Optional
 
 from api.models import ConvertResponse
@@ -35,6 +36,9 @@ and declaration, one for one, in the same order. Do NOT summarize, merge,
 deduplicate, refactor, generalize, or omit anything, even if the input is long or
 repetitive. The output must contain an equivalent of every top-level item in the
 input. Never replace repeated code with a single generalized version.
+Preserve comments AS comments in the target's comment syntax - NEVER turn
+commented-out code into executable code, and do not invent extra scaffolding,
+test calls, or a `main` that the input did not contain.
 
 ## OUTPUT FORMAT
 Return ONLY the converted code inside a single ```{fence} code fence. No prose
@@ -166,7 +170,7 @@ class LLMConverter:
         try:
             raw = self._complete(system, user, max_tokens)
         except Exception as e:  # network / auth / rate-limit / bad model
-            return self._fallback(code, f"{type(e).__name__}: {e}")
+            return self._fallback(code, self._friendly_error(e))
 
         converted = self._extract_code(raw)
         if not converted.strip():
@@ -214,17 +218,69 @@ class LLMConverter:
         return PROMPTS.get((source, target)) or _generic_prompt(source, target)
 
     def _complete(self, system: str, user: str, max_tokens: int) -> str:
-        """Isolated LLM call. Injected in tests; hits Groq in production."""
+        """
+        Isolated LLM call. Injected in tests; hits Groq in production.
+        Retries transient failures (rate-limit / timeout / 5xx) with a short,
+        capped backoff so a small burst of demo conversions recovers instead of
+        returning a blank box. Persistent failures propagate to the caller, which
+        falls back to the rule-based converter or a friendly error.
+        """
         if self._completion_fn is not None:
             return self._completion_fn(system, user, max_tokens)
-        resp = self._get_client().chat.completions.create(
-            model=self.model,
-            messages=[{"role": "system", "content": system},
-                      {"role": "user", "content": user}],
-            temperature=0.1,          # low for near-deterministic translation
-            max_tokens=max_tokens,
-        )
-        return resp.choices[0].message.content or ""
+        client = self._get_client()
+        last_err = None
+        for attempt in range(3):
+            try:
+                resp = client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "system", "content": system},
+                              {"role": "user", "content": user}],
+                    temperature=0.1,      # low for near-deterministic translation
+                    max_tokens=max_tokens,
+                )
+                return resp.choices[0].message.content or ""
+            except Exception as e:
+                last_err = e
+                if attempt < 2 and self._is_transient(e):
+                    time.sleep(self._retry_wait(e, attempt))
+                    continue
+                raise
+        raise last_err  # pragma: no cover
+
+    @staticmethod
+    def _is_transient(e: Exception) -> bool:
+        name = type(e).__name__
+        s = str(e)
+        return ("RateLimit" in name or "APITimeout" in name or "Timeout" in name
+                or "APIConnection" in name or "InternalServer" in name
+                or " 429" in s or " 500" in s or " 502" in s or " 503" in s)
+
+    @staticmethod
+    def _retry_wait(e: Exception, attempt: int) -> float:
+        """Respect a Retry-After header if present (capped), else exp backoff."""
+        try:
+            resp = getattr(e, "response", None)
+            if resp is not None:
+                hdr = resp.headers.get("retry-after") or resp.headers.get("Retry-After")
+                if hdr:
+                    return min(float(hdr), 12.0)
+        except Exception:
+            pass
+        return min(2.0 * (2 ** attempt), 12.0)  # 2s, 4s (capped 12s)
+
+    @staticmethod
+    def _friendly_error(e: Exception) -> str:
+        """Human-readable message that NEVER leaks raw vendor text (org id / billing URL)."""
+        name = type(e).__name__
+        s = str(e)
+        if "RateLimit" in name or " 429" in s:
+            return ("The AI service is rate-limited right now (free-tier "
+                    "tokens-per-minute cap). Please wait a few seconds and retry.")
+        if "Authentication" in name or "Permission" in name or " 401" in s or " 403" in s:
+            return "The AI service rejected the API key. Check GROQ_API_KEY."
+        if "APITimeout" in name or "Timeout" in name or "APIConnection" in name:
+            return "The AI service did not respond in time. Please try again."
+        return f"AI service error ({name}). Please try again."
 
     def _get_client(self):
         if self._client is None:
@@ -232,7 +288,8 @@ class LLMConverter:
                 from groq import Groq
             except ImportError:
                 raise ImportError("groq package required: pip install groq")
-            self._client = Groq(api_key=self.api_key)
+            # max_retries=0: we handle retries in _complete; timeout caps hangs.
+            self._client = Groq(api_key=self.api_key, timeout=30.0, max_retries=0)
         return self._client
 
     def _calculate_max_tokens(self, code: str) -> int:
