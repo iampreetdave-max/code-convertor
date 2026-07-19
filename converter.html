@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Converter — CodeTransform</title>
+  <meta name="description" content="Convert code between Python, JavaScript, Java and more with confidence scoring." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+  <!-- Prism.js for syntax highlighting -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-rust.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ruby.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-php.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
+
+  <!-- Diff library for line-by-line comparison -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
+
+  <!-- Site styles (design tokens + original converter styles) -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="min-h-screen text-white flex flex-col font-body" style="background-color:#0a0a0a;">
+
+  <!-- Top nav (new — links back to landing page) -->
+  <header class="nav-glass sticky top-0 z-50">
+    <nav class="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3" aria-label="Primary">
+      <a href="index.html" class="flex items-center gap-2.5" aria-label="CodeTransform home">
+        <span class="w-8 h-8 rounded-lg flex items-center justify-center btn-gradient">
+          <i data-lucide="code-2" class="w-4 h-4 text-white"></i>
+        </span>
+        <span class="font-display font-semibold text-base">CodeTransform</span>
+      </a>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <a href="index.html" class="hidden sm:inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white transition px-2 py-1.5">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          Back to home
+        </a>
+        <button id="themeToggle" type="button" aria-label="Toggle light and dark theme" class="p-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition">
+          <i data-lucide="sun" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ===================================================================
+       Everything below is the ORIGINAL converter UI. Element IDs and
+       classes are unchanged from the source repository so the JavaScript
+       in js/app.js binds exactly as it did before.
+       =================================================================== -->
+  <div class="converter-shell flex-1 flex flex-col" style="background-color:#0a0a0a;">
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <!-- Header -->
+    <header class="flex justify-between items-center px-6 py-3 border-b border-neutral-800 bg-neutral-900/50">
+      <div class="flex items-center space-x-3">
+        <div class="bg-white p-2 rounded-lg">
+          <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-semibold text-white">CodeTransform</h1>
+          <p class="text-xs text-neutral-500">Professional Code Converter</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <!-- Stats Mini -->
+        <div class="hidden md:flex items-center gap-4 text-xs">
+          <div class="flex items-center gap-1.5">
+            <span class="text-neutral-500">Conversions:</span>
+            <span id="conversionCount" class="font-semibold text-white">0</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-neutral-500">Success:</span>
+            <span id="successRate" class="font-semibold text-neutral-300">100%</span>
+          </div>
+        </div>
+        <button onclick="toggleHistory()" class="flex items-center gap-2 px-3 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-sm transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          History
+        </button>
+      </div>
+    </header>
+
+    <!-- History Sidebar -->
+    <div id="historySidebar" class="fixed right-0 top-0 h-full w-80 bg-neutral-900 border-l border-neutral-800 transform translate-x-full transition-transform z-40">
+      <div class="p-4 border-b border-neutral-800 flex justify-between items-center">
+        <h3 class="font-semibold">Conversion History</h3>
+        <button onclick="toggleHistory()" class="text-neutral-400 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div id="historyList" class="overflow-y-auto h-[calc(100%-120px)] p-2"></div>
+      <div class="p-4 border-t border-neutral-800">
+        <button onclick="clearHistory()" class="w-full py-2 bg-neutral-700 hover:bg-neutral-600 rounded text-sm transition">Clear History</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col p-4 lg:p-6 overflow-auto">
+
+      <!-- Side-by-Side Editors Section -->
+      <div class="bg-neutral-900/50 backdrop-blur w-full max-w-7xl mx-auto rounded-xl border border-neutral-800 overflow-hidden">
+
+        <!-- Editor Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-neutral-800">
+
+          <!-- Source Code Panel (Left) -->
+          <div class="flex flex-col">
+            <!-- Panel Header -->
+            <div class="flex items-center justify-between px-4 py-3 bg-neutral-900/50 border-b border-neutral-800">
+              <div class="flex items-center gap-3">
+                <h3 class="text-sm font-semibold text-neutral-200">Source Code</h3>
+                <span id="sourceLanguageBadge" class="language-badge hidden px-2 py-0.5 bg-neutral-700/50 text-neutral-300 rounded-full font-medium uppercase">
+                  Python
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="sourceLineCount" class="text-xs text-neutral-500">0 lines</span>
+                <button onclick="formatSourceCode()" class="btn-icon p-1.5 bg-neutral-800 hover:bg-neutral-700 rounded text-xs" title="Format code">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/>
+                  </svg>
+                </button>
+                <button onclick="clearSource()" class="btn-icon p-1.5 bg-neutral-800 hover:bg-neutral-700 rounded text-xs" title="Clear source">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Language Selector & Upload -->
+            <div class="px-4 py-3 bg-neutral-900/30 border-b border-neutral-800">
+              <div class="flex gap-3">
+                <select id="fromLanguage" class="flex-1 p-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-white focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 transition">
+                  <option value="">Auto-detect language</option>
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="java">Java</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="cpp">C++</option>
+                  <option value="csharp">C#</option>
+                  <option value="go">Go</option>
+                  <option value="rust">Rust</option>
+                  <option value="ruby">Ruby</option>
+                  <option value="php">PHP</option>
+                </select>
+                <label id="dropZone" class="drop-zone flex items-center gap-2 px-3 py-2 border border-dashed border-neutral-700 rounded-lg cursor-pointer hover:border-neutral-400 transition text-xs text-neutral-400">
+                  <input type="file" id="fileInput" class="hidden" accept=".py,.js,.ts,.java,.cpp,.c,.cs,.go,.rs,.rb,.php,.txt" />
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                  </svg>
+                  <span>Upload</span>
+                </label>
+              </div>
+              <div id="detectedLanguageDisplay" class="text-xs text-neutral-400 mt-2 hidden">
+                Detected language: <span id="detectedLanguageName" class="text-white font-semibold"></span>
+              </div>
+            </div>
+
+            <!-- Source Editor with Syntax Highlighting -->
+            <div class="relative flex-1 min-h-[300px] lg:min-h-[400px] code-editor-container bg-neutral-900">
+              <div id="sourceHighlight" class="highlight-layer">
+                <pre><code id="sourceCodeHighlight" class="language-python"></code></pre>
+              </div>
+              <textarea id="sourceCode" placeholder="// Paste your source code here or upload a file...&#10;// The source language will be auto-detected"
+                class="code-textarea w-full h-full p-4 focus:outline-none focus:ring-1 focus:ring-neutral-500/50" spellcheck="false"></textarea>
+            </div>
+          </div>
+
+          <!-- Converted Code Panel (Right) -->
+          <div class="flex flex-col">
+            <!-- Panel Header -->
+            <div class="flex items-center justify-between px-4 py-3 bg-neutral-900/50 border-b border-neutral-800">
+              <div class="flex items-center gap-3">
+                <h3 class="text-sm font-semibold text-neutral-200">Converted Code</h3>
+                <span id="targetLanguageBadge" class="language-badge hidden px-2 py-0.5 bg-neutral-700/50 text-neutral-300 rounded-full font-medium uppercase">
+                  JavaScript
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="outputLineCount" class="text-xs text-neutral-500">0 lines</span>
+                <button onclick="copyOutput()" class="btn-icon p-1.5 bg-neutral-800 hover:bg-neutral-700 rounded text-xs" title="Copy to clipboard">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                </button>
+                <button onclick="downloadCode()" class="btn-icon p-1.5 bg-white text-black hover:bg-neutral-200 rounded text-xs" title="Download code">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                  </svg>
+                </button>
+                <button onclick="copyAsMarkdown()" class="btn-icon p-1.5 bg-neutral-800 hover:bg-neutral-700 rounded text-xs" title="Copy as Markdown">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                  </svg>
+                </button>
+                <button onclick="formatOutputCode()" class="btn-icon p-1.5 bg-neutral-800 hover:bg-neutral-700 rounded text-xs" title="Format code">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Target Language Selector -->
+            <div class="px-4 py-3 bg-neutral-900/30 border-b border-neutral-800">
+              <div class="flex gap-3">
+                <select id="toLanguage" class="flex-1 p-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-white focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 transition">
+                  <option value="">Select target language</option>
+                  <option value="python">Python</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="java">Java</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="cpp">C++</option>
+                  <option value="csharp">C#</option>
+                  <option value="go">Go</option>
+                  <option value="rust">Rust</option>
+                  <option value="ruby">Ruby</option>
+                  <option value="php">PHP</option>
+                </select>
+                <button onclick="swapLanguages()" class="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition" title="Swap languages & code">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Output Editor with Syntax Highlighting (Read-only) -->
+            <div class="relative flex-1 min-h-[300px] lg:min-h-[400px] code-editor-container bg-neutral-900">
+              <div id="outputHighlight" class="highlight-layer">
+                <pre><code id="outputCodeHighlight" class="language-javascript"></code></pre>
+              </div>
+              <textarea id="outputCode" placeholder="// Converted code will appear here after conversion...&#10;// Click 'Convert Code' to start" readonly
+                class="code-textarea w-full h-full p-4 focus:outline-none cursor-default" spellcheck="false"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Convert Button Bar -->
+        <div class="flex items-center justify-center gap-4 px-4 py-4 bg-neutral-900/50 border-t border-neutral-800">
+          <button id="convertBtn" onclick="convertCode()" class="flex items-center gap-2 bg-white text-black hover:bg-neutral-200 px-8 py-3 rounded-lg font-semibold transition transform hover:scale-105 shadow-lg shadow-white/10">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Convert Code
+          </button>
+          <div class="text-xs text-neutral-600">
+            <kbd class="px-1.5 py-0.5 bg-neutral-800 rounded text-neutral-400">Ctrl</kbd>+<kbd class="px-1.5 py-0.5 bg-neutral-800 rounded text-neutral-400">Enter</kbd>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conversion Report Panel (Below Editors) -->
+      <div id="conversionReport" class="hidden w-full max-w-7xl mx-auto mt-6 bg-neutral-900/50 backdrop-blur rounded-xl border border-neutral-800 overflow-hidden">
+
+        <!-- Report Header -->
+        <div class="flex items-center justify-between px-6 py-4 bg-neutral-900/50 border-b border-neutral-800">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <h3 class="text-lg font-semibold text-white">Conversion Report</h3>
+          </div>
+          <div id="reportTimestamp" class="text-xs text-neutral-500"></div>
+        </div>
+
+        <!-- Report Content -->
+        <div class="p-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Column 1: Overall Confidence Score -->
+            <div class="lg:col-span-1">
+              <div id="confidenceCard" class="bg-neutral-900/50 rounded-xl p-6 border border-neutral-800 text-center">
+                <!-- Circular Progress -->
+                <div class="relative w-32 h-32 mx-auto mb-4">
+                  <svg class="w-full h-full transform -rotate-90">
+                    <circle cx="64" cy="64" r="56" stroke="currentColor" stroke-width="8" fill="none" class="text-neutral-800"/>
+                    <circle id="confidenceRing" cx="64" cy="64" r="56" stroke="currentColor" stroke-width="8" fill="none"
+                      class="confidence-ring text-white"
+                      stroke-dasharray="352"
+                      stroke-dashoffset="352"
+                      stroke-linecap="round"/>
+                  </svg>
+                  <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span id="confidencePercent" class="text-3xl font-bold text-white">0%</span>
+                  </div>
+                </div>
+                <h4 class="text-lg font-semibold text-white mb-1">Conversion Confidence</h4>
+                <p id="confidenceLabel" class="text-sm text-neutral-400 font-medium">Awaiting Conversion</p>
+                <p id="confidenceHint" class="text-xs text-neutral-500 mt-2"></p>
+              </div>
+            </div>
+
+            <!-- Column 2: Confidence Breakdown & Coverage -->
+            <div class="lg:col-span-2 space-y-6">
+
+              <!-- Confidence Breakdown -->
+              <div class="bg-neutral-900/50 rounded-xl p-5 border border-neutral-800">
+                <h4 class="text-sm font-semibold text-neutral-300 mb-4 flex items-center gap-2">
+                  <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                  Confidence Breakdown
+                </h4>
+                <div class="space-y-3">
+                  <!-- Structure Preservation -->
+                  <div>
+                    <div class="flex justify-between text-xs mb-1">
+                      <span class="text-neutral-400">Structure Preservation</span>
+                      <span id="structureScore" class="text-neutral-300">--</span>
+                    </div>
+                    <div class="h-2 bg-neutral-800 rounded-full overflow-hidden">
+                      <div id="structureBar" class="progress-bar h-full bg-white rounded-full" style="width: 0%"></div>
+                    </div>
+                  </div>
+                  <!-- Syntax Validity -->
+                  <div>
+                    <div class="flex justify-between text-xs mb-1">
+                      <span class="text-neutral-400">Syntax Validity</span>
+                      <span id="syntaxScore" class="text-neutral-300">--</span>
+                    </div>
+                    <div class="h-2 bg-neutral-800 rounded-full overflow-hidden">
+                      <div id="syntaxBar" class="progress-bar h-full bg-neutral-300 rounded-full" style="width: 0%"></div>
+                    </div>
+                  </div>
+                  <!-- Conversion Completeness -->
+                  <div>
+                    <div class="flex justify-between text-xs mb-1">
+                      <span class="text-neutral-400">Conversion Completeness</span>
+                      <span id="completenessScore" class="text-neutral-300">--</span>
+                    </div>
+                    <div class="h-2 bg-neutral-800 rounded-full overflow-hidden">
+                      <div id="completenessBar" class="progress-bar h-full bg-neutral-400 rounded-full" style="width: 0%"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Accuracy & Coverage Summary -->
+              <div class="bg-neutral-900/50 rounded-xl p-5 border border-neutral-800">
+                <h4 class="text-sm font-semibold text-neutral-300 mb-4 flex items-center gap-2">
+                  <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  Accuracy & Coverage
+                </h4>
+                <div id="constructsSummary" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <p class="text-xs text-neutral-500 col-span-full">No conversion data yet</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Warnings & Recommendations -->
+          <div id="warningsSection" class="mt-6 bg-neutral-900/50 rounded-xl p-5 border border-neutral-800">
+            <h4 class="text-sm font-semibold text-neutral-300 mb-4 flex items-center gap-2">
+              <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+              Warnings & Recommendations
+            </h4>
+            <div id="warningsList" class="space-y-2">
+              <p class="text-sm text-neutral-400 flex items-center gap-2">
+                <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                No major issues detected.
+              </p>
+            </div>
+            <p id="warningsSummary" class="hidden text-xs text-neutral-400 mt-3 pt-3 border-t border-neutral-800">
+              Manual review recommended for highlighted items.
+            </p>
+          </div>
+
+          <!-- Diff View Section -->
+          <div id="diffSection" class="mt-6 bg-neutral-900/50 rounded-xl border border-neutral-800 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-neutral-800">
+              <h4 class="text-sm font-semibold text-neutral-300 flex items-center gap-2">
+                <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                Line-by-Line Diff View
+              </h4>
+              <div id="diffStats" class="diff-stats hidden">
+                <span class="text-neutral-300">+<span id="diffAdded">0</span> added</span>
+                <span class="text-neutral-500">-<span id="diffRemoved">0</span> removed</span>
+                <span class="text-neutral-600"><span id="diffUnchanged">0</span> unchanged</span>
+              </div>
+            </div>
+            <div id="diffContent" class="diff-container max-h-[400px] overflow-auto p-4 bg-neutral-900">
+              <p class="text-sm text-neutral-500 text-center py-8">Diff will appear after conversion</p>
+            </div>
+          </div>
+
+          <!-- AI Validation Results Section -->
+          <div id="validationSection" class="hidden mt-6 bg-neutral-900/50 rounded-xl border border-neutral-800 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-neutral-800">
+              <h4 class="text-sm font-semibold text-neutral-300 flex items-center gap-2">
+                <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+                AI Validation
+              </h4>
+              <span id="validationStatus" class="text-xs text-neutral-500"></span>
+            </div>
+            <div id="validationContent" class="p-5">
+              <p class="text-sm text-neutral-500 text-center py-4">Validating converted code...</p>
+            </div>
+          </div>
+
+          <!-- Collapsible Metadata Section -->
+          <div class="mt-6">
+            <button onclick="toggleMetadata()" class="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-300 transition">
+              <svg id="metadataChevron" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+              Technical Metadata
+            </button>
+            <div id="metadataContent" class="collapsible-content mt-3">
+              <div class="bg-neutral-900/50 rounded-xl p-5 border border-neutral-800">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <p id="metaLinesProcessed" class="text-2xl font-bold text-white">--</p>
+                    <p class="text-xs text-neutral-500">Lines Processed</p>
+                  </div>
+                  <div>
+                    <p id="metaBlocksDetected" class="text-2xl font-bold text-neutral-300">--</p>
+                    <p class="text-xs text-neutral-500">Blocks Detected</p>
+                  </div>
+                  <div>
+                    <p id="metaConversionLevel" class="text-2xl font-bold text-neutral-300">--</p>
+                    <p class="text-xs text-neutral-500">Conversion Level</p>
+                  </div>
+                  <div>
+                    <p id="metaConversionTime" class="text-2xl font-bold text-neutral-300">--</p>
+                    <p class="text-xs text-neutral-500">Conversion Time</p>
+                  </div>
+                </div>
+                <div id="metaUnsupported" class="hidden mt-4 pt-4 border-t border-neutral-800">
+                  <p class="text-xs text-neutral-400 mb-2">Unsupported Constructs:</p>
+                  <div id="unsupportedList" class="text-xs text-neutral-400"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <p class="text-neutral-600 text-xs text-center mt-6">
+        Powered by FastAPI backend -- 122+ conversion rules -- Groq AI validation
+      </p>
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    if (window.lucide) lucide.createIcons();
+  </script>
+</body>
+</html>
