@@ -1,9 +1,11 @@
+from functools import partial
 from typing import Dict
 from api.models import ConvertResponse
 from core.language_detector import LanguageDetector
 from converters.python_to_javascript import PythonToJavaScriptConverter
 from converters.javascript_to_python import JavaScriptToPythonConverter
 from converters.python_to_java import PythonToJavaConverter
+from converters.llm_converter import LLMConverter
 
 
 class ConversionEngine:
@@ -12,10 +14,14 @@ class ConversionEngine:
     def __init__(self):
         """Initialize the conversion engine with available converters."""
         self.detector = LanguageDetector()
+        # Values are zero-arg factories that build a converter instance.
+        # LLM pairs use partial() to bind the (source, target) the class needs.
         self.converters: Dict[tuple, type] = {
             ("python", "javascript"): PythonToJavaScriptConverter,
             ("javascript", "python"): JavaScriptToPythonConverter,
             ("python", "java"): PythonToJavaConverter,
+            ("java", "typescript"): partial(LLMConverter, "java", "typescript"),
+            ("html", "typescript"): partial(LLMConverter, "html", "typescript"),
         }
 
     def convert(
