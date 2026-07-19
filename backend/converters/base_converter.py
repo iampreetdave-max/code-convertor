@@ -64,6 +64,12 @@ class BaseConverter(ABC):
                 metadata={"lines_processed": 0}
             )
 
+        # Reset per-conversion state so a reused converter instance is idempotent.
+        # (The app makes a fresh converter per request, but tests/batch callers
+        # reuse instances; without this, warnings and level leak across calls.)
+        self.warnings.clear()
+        self.current_level = ConversionLevel.LEVEL_1
+
         # Initialize rules
         self._initialize_rules()
 
@@ -77,13 +83,26 @@ class BaseConverter(ABC):
         # Generate output
         converted_code = "\n".join(converted_lines)
 
+        # Validate the output actually parses in the target language (once), and
+        # surface a warning if it does not. This drives an honest confidence score.
+        syntax_valid = self.confidence_calculator.validate_output_syntax(
+            converted_code, self.target_lang
+        )
+        if syntax_valid is False:
+            self.warnings.add_warning(
+                f"Converted {self.target_lang} code failed syntax validation - the "
+                f"output does not parse and likely needs manual correction."
+            )
+
         # Calculate confidence
         conversion_confidence = self.confidence_calculator.calculate(
             original_code=code,
             converted_code=converted_code,
             lines_converted=len([l for l in converted_lines if l.strip()]),
             total_lines=len(parsed_lines),
-            unsupported_count=len(self.warnings.unsupported_constructs)
+            unsupported_count=len(self.warnings.unsupported_constructs),
+            target_lang=self.target_lang,
+            syntax_valid=syntax_valid,
         )
 
         # Get warnings
