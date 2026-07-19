@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from api.models import (
     DetectRequest, DetectResponse,
     ConvertRequest, ConvertResponse,
@@ -32,6 +31,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def enforce_max_request_size(request: Request, call_next):
+    """
+    Reject over-limit request bodies early, before they are read into memory.
+
+    Checks the Content-Length header (browsers and JSON clients always send it).
+    ponytail: header check only — a streaming client with no Content-Length can
+    still bypass this; upgrade to a read-and-count wrapper if untrusted streaming
+    clients become a concern.
+    """
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            declared_size = int(content_length)
+        except ValueError:
+            return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header."})
+        if declared_size > MAX_REQUEST_SIZE:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": f"Request body too large. Limit is {MAX_REQUEST_SIZE} bytes."},
+            )
+    return await call_next(request)
 
 # Initialize core modules
 detector = LanguageDetector()
@@ -247,6 +270,15 @@ def convert_and_validate(req: ConvertAndValidateRequest):
         raise HTTPException(status_code=500, detail=f"Conversion error: {str(e)}")
 
 
-# Serve frontend - MUST be mounted after all API routes
-frontend_path = os.path.join(os.path.dirname(__file__), "..")
-app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+# Serve the self-contained frontend at "/" ONLY.
+# ponytail: index.html has no local asset deps (CDN + API fetches only), so we
+# serve that single file instead of mounting the project root. The previous
+# `app.mount("/", StaticFiles(directory=".."))` exposed .env, .git/, and all
+# backend source over HTTP (GET /.env leaked the API key).
+INDEX_HTML_PATH = os.path.join(os.path.dirname(__file__), "..", "index.html")
+
+
+@app.get("/", include_in_schema=False)
+def serve_frontend():
+    """Serve the frontend single-page app."""
+    return FileResponse(INDEX_HTML_PATH, media_type="text/html")

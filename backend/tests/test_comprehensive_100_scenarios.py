@@ -32,8 +32,11 @@ class TestAPIEndpoints:
     """Test REST API endpoints directly"""
 
     def test_api_root_endpoint(self):
-        """Test health check endpoint returns correct status"""
-        response = client.get("/")
+        """Test health check endpoint returns correct status.
+
+        Health/JSON lives at /api/health; "/" now serves the frontend HTML.
+        """
+        response = client.get("/api/health")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "Backend running"
