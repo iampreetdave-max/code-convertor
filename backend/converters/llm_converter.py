@@ -150,6 +150,7 @@ class LLMConverter:
         self._completion_fn = completion_fn
         self._client = None
         self._confidence = ConfidenceCalculator()
+        self._last_finish_reason = None  # set by _complete on the real API path
 
     # ------------------------------------------------------------------ public
     def convert(self, code: str) -> ConvertResponse:
@@ -199,6 +200,20 @@ class LLMConverter:
                     f"available); confidence is the model's self-report."
                 )
 
+        # Two failure modes the syntax check can't see:
+        #  - TRUNCATION: the model hit the output-token cap -> output cut off.
+        #  - COLLAPSE: the model summarized instead of translating 1:1.
+        truncated = self._last_finish_reason == "length"
+        if truncated:
+            warnings.insert(0, "Output was truncated at the token limit - the conversion "
+                              "is likely incomplete. Convert it in smaller pieces.")
+        survival = self._surviving_fraction(code, converted, self.source_lang)
+        if survival < 0.70:
+            warnings.insert(0, f"Conversion may be incomplete - only {survival:.0%} of source "
+                              f"declarations were found in the output. Try smaller pieces.")
+        if truncated or survival < 0.70:
+            confidence = min(confidence, 0.4)
+
         unsupported = self._detect_unsupported(converted)
         return self._response(
             converted, confidence, warnings, unsupported, level=3,
@@ -209,6 +224,8 @@ class LLMConverter:
                 "source_lines": len(code.splitlines()),
                 "target_lines": len(converted.splitlines()),
                 "syntax_validated": syntax_valid,
+                "finish_reason": self._last_finish_reason,
+                "name_survival": round(survival, 2),
             },
         )
 
@@ -238,7 +255,9 @@ class LLMConverter:
                     temperature=0.1,      # low for near-deterministic translation
                     max_tokens=max_tokens,
                 )
-                return resp.choices[0].message.content or ""
+                choice = resp.choices[0]
+                self._last_finish_reason = getattr(choice, "finish_reason", None)
+                return choice.message.content or ""
             except Exception as e:
                 last_err = e
                 if attempt < 2 and self._is_transient(e):
@@ -330,6 +349,47 @@ class LLMConverter:
                 if "low" in low:
                     return 0.50, reason or "significant constructs have no faithful equivalent"
         return 0.80, ""  # unspecified -> cautious default
+
+    # --- completeness guardrail: did the source's declarations survive? --------
+    _NAME_PATTERNS = {
+        "python": [r"^\s*def\s+(\w+)", r"^\s*class\s+(\w+)"],
+        "javascript": [r"\bfunction\s+(\w+)", r"\bclass\s+(\w+)",
+                       r"\b(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\("],
+        "typescript": [r"\bfunction\s+(\w+)", r"\bclass\s+(\w+)", r"\binterface\s+(\w+)",
+                       r"\b(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\("],
+        "java": [r"\bclass\s+(\w+)", r"\b(?:public|private|protected|static|final)\s+[\w<>\[\]]+\s+(\w+)\s*\("],
+        "csharp": [r"\bclass\s+(\w+)", r"\b(?:public|private|protected|static)\s+[\w<>\[\]]+\s+(\w+)\s*\("],
+        "cpp": [r"\bclass\s+(\w+)"],
+        "go": [r"\bfunc\s+(?:\([^)]*\)\s*)?(\w+)", r"\btype\s+(\w+)"],
+        "rust": [r"\bfn\s+(\w+)", r"\bstruct\s+(\w+)", r"\benum\s+(\w+)"],
+        "ruby": [r"\bdef\s+(\w+)", r"\bclass\s+(\w+)"],
+        "php": [r"\bfunction\s+(\w+)", r"\bclass\s+(\w+)"],
+    }
+    _GENERIC_NAME_PATTERN = r"\b(?:def|function|func|fn|class|struct)\s+(\w+)"
+
+    @staticmethod
+    def _norm(name: str) -> str:
+        return name.replace("_", "").lower()  # snake_case ~= camelCase
+
+    @classmethod
+    def _extract_names(cls, code: str, lang: str) -> set:
+        pats = cls._NAME_PATTERNS.get((lang or "").lower(), [cls._GENERIC_NAME_PATTERN])
+        names = set()
+        for p in pats:
+            for m in re.findall(p, code, re.MULTILINE):
+                if m and m not in ("__init__", "constructor", "main"):
+                    names.add(m)
+        return names
+
+    @classmethod
+    def _surviving_fraction(cls, src: str, out: str, src_lang: str) -> float:
+        """Fraction of source declaration names present as identifiers in output."""
+        names = cls._extract_names(src, src_lang)
+        if len(names) < 3:
+            return 1.0  # too few to reliably detect a collapse
+        out_ids = {cls._norm(t) for t in re.findall(r"[A-Za-z_]\w*", out)}
+        present = sum(1 for n in names if cls._norm(n) in out_ids)
+        return present / len(names)
 
     @staticmethod
     def _detect_unsupported(code: str) -> list:

@@ -36,6 +36,16 @@ class ConfidenceCalculator:
     # Cached tool lookups (class-level; resolved once per process).
     _TOOL_PATHS: dict = {}
 
+    # tree-sitter parsers (pure-wheel, no compiler) give a real parse-check for
+    # languages we have no local compiler for. Cached per grammar.
+    _TS_PARSERS: dict = {}
+    _TS_GRAMMAR = {
+        "typescript": "typescript", "ts": "typescript", "tsx": "tsx",
+        "go": "go", "golang": "go", "rust": "rust",
+        "cpp": "cpp", "c++": "cpp", "c": "c", "csharp": "csharp", "c_sharp": "csharp",
+        "ruby": "ruby", "php": "php", "kotlin": "kotlin", "swift": "swift",
+    }
+
     # ------------------------------------------------------------------ score
     def calculate(
         self,
@@ -119,11 +129,30 @@ class ConfidenceCalculator:
             return self._validate_python(code)
         if lang == "javascript":
             return self._validate_javascript(code)
-        if lang in ("typescript", "ts"):
-            return self._validate_typescript(code)
+        if lang in ("typescript", "ts", "tsx"):
+            # tree-sitter is authoritative (and avoids tsc's false-fail on
+            # unresolved imports); fall back to tsc only if the dep is absent.
+            res = self._validate_treesitter(code, lang)
+            return res if res is not None else self._validate_typescript(code)
         if lang == "java":
             return self._validate_java(code)
-        return None
+        # go / rust / cpp / csharp / ruby / php / ... -> tree-sitter parse-check.
+        return self._validate_treesitter(code, lang)
+
+    @classmethod
+    def _validate_treesitter(cls, code: str, lang: str) -> Optional[bool]:
+        """Parse-only check via tree-sitter (no compiler). True/False/None."""
+        key = cls._TS_GRAMMAR.get((lang or "").lower())
+        if key is None:
+            return None
+        try:
+            if key not in cls._TS_PARSERS:
+                from tree_sitter_language_pack import get_parser
+                cls._TS_PARSERS[key] = get_parser(key)
+            tree = cls._TS_PARSERS[key].parse(bytes(code, "utf-8"))
+            return not tree.root_node.has_error  # covers ERROR and MISSING nodes
+        except Exception:
+            return None  # dep/lang unavailable -> None never penalizes
 
     @staticmethod
     def _compile_check_enabled() -> bool:
