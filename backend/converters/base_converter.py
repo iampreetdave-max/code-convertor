@@ -113,7 +113,8 @@ class BaseConverter(ABC):
             "lines_processed": len(lines),
             "blocks_detected": self.indentation_tracker.block_count,
             "indentation_levels": self.indentation_tracker.max_indent_level,
-            "constructs_found": self._count_constructs(parsed_lines)
+            "constructs_found": self._count_constructs(parsed_lines),
+            "syntax_validated": syntax_valid,
         }
 
         return ConvertResponse(
@@ -307,32 +308,38 @@ class BaseConverter(ABC):
 
         return indent + line
 
+    # A single- or double-quoted string literal (handles escapes).
+    _STRING_LITERAL_RE = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'')
+
     def _convert_common_patterns(self, line: str) -> str:
         """
-        Convert common syntax patterns.
-
-        Args:
-            line: Code line
-
-        Returns:
-            Converted line
+        Convert common syntax patterns, but ONLY outside string literals so the
+        contents of quoted text are never rewritten (e.g. "a == b and None"
+        must stay verbatim, not become "a === b && null").
         """
-        # Boolean values - use word boundaries to handle all contexts
-        line = re.sub(r"\bTrue\b", "true", line)
-        line = re.sub(r"\bFalse\b", "false", line)
+        def transform(seg: str) -> str:
+            seg = re.sub(r"\bTrue\b", "true", seg)
+            seg = re.sub(r"\bFalse\b", "false", seg)
+            seg = re.sub(r"\band\b", "&&", seg)
+            seg = re.sub(r"\bor\b", "||", seg)
+            seg = re.sub(r"\bnot\b\s+", "!", seg)
+            seg = re.sub(r"\bNone\b", "null", seg)
+            seg = seg.replace("==", "===")
+            return seg
 
-        # Logical operators
-        line = re.sub(r"\band\b", "&&", line)
-        line = re.sub(r"\bor\b", "||", line)
-        line = re.sub(r"\bnot\b\s+", "!", line)
+        return self._apply_outside_strings(line, transform)
 
-        # None to null - use word boundary to avoid corrupting identifiers
-        line = re.sub(r"\bNone\b", "null", line)
-
-        # Equality operators
-        line = line.replace("==", "===")
-
-        return line
+    @classmethod
+    def _apply_outside_strings(cls, line: str, fn) -> str:
+        """Apply fn to the parts of `line` that are NOT inside a string literal."""
+        non_literals = cls._STRING_LITERAL_RE.split(line)
+        literals = cls._STRING_LITERAL_RE.findall(line)
+        out = []
+        for i, seg in enumerate(non_literals):
+            out.append(fn(seg))
+            if i < len(literals):
+                out.append(literals[i])  # keep string literal verbatim
+        return "".join(out)
 
     def _count_constructs(self, parsed_lines: List[ParsedLine]) -> Dict[str, int]:
         """Count construct types found in code."""
