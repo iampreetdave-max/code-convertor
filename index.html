@@ -307,6 +307,7 @@
             <div class="flex gap-3">
               <select id="fromLanguage" class="flex-1 p-2 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-white focus:border-neutral-400 focus:ring-1 focus:ring-neutral-400 transition">
                 <option value="">Auto-detect language</option>
+                <option value="html">HTML</option>
                 <option value="python">Python</option>
                 <option value="javascript">JavaScript</option>
                 <option value="java">Java</option>
@@ -419,10 +420,34 @@
           </svg>
           Convert Code
         </button>
+        <button id="previewToggleBtn" onclick="togglePreview()" class="flex items-center gap-2 bg-neutral-800 text-neutral-200 hover:bg-neutral-700 px-5 py-3 rounded-lg font-semibold transition" title="Toggle live HTML preview">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
+          Preview
+        </button>
         <div class="text-xs text-neutral-600">
           <kbd class="px-1.5 py-0.5 bg-neutral-800 rounded text-neutral-400">Ctrl</kbd>+<kbd class="px-1.5 py-0.5 bg-neutral-800 rounded text-neutral-400">Enter</kbd>
         </div>
       </div>
+    </div>
+
+    <!-- Live Preview Panel (Below Editors) -->
+    <div id="previewPanel" class="hidden w-full max-w-7xl mx-auto mt-6 bg-neutral-900/50 backdrop-blur rounded-xl border border-neutral-800 overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-3 bg-neutral-900/50 border-b border-neutral-800">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
+          <h3 class="text-sm font-semibold text-white">Live Preview</h3>
+          <span class="text-xs text-neutral-500">renders HTML source in a sandboxed frame</span>
+        </div>
+        <button onclick="togglePreview()" class="text-xs text-neutral-400 hover:text-white transition">Hide</button>
+      </div>
+      <iframe id="previewFrame" sandbox="allow-scripts" title="Live preview" class="w-full h-[400px] border-0 bg-white"></iframe>
+      <div id="previewHint" class="p-6 text-sm text-neutral-500">No HTML detected in the source. Paste HTML (or set the source language to HTML) to see a live preview.</div>
     </div>
 
     <!-- Conversion Report Panel (Below Editors) -->
@@ -654,7 +679,8 @@
       'go': 'go',
       'rust': 'rust',
       'ruby': 'ruby',
-      'php': 'php'
+      'php': 'php',
+      'html': 'markup'
     };
 
     // Language to file extension mapping
@@ -682,7 +708,8 @@
       'go': 'Go',
       'rust': 'Rust',
       'ruby': 'Ruby',
-      'php': 'PHP'
+      'php': 'PHP',
+      'html': 'HTML'
     };
 
     // Stats tracking
@@ -714,6 +741,7 @@
       // Update highlighting on input and trigger auto-detection
       sourceCode.addEventListener('input', () => {
         updateSourceHighlight();
+        updatePreview();
 
         // Auto-detect language with debouncing
         clearTimeout(detectionTimeout);
@@ -740,8 +768,41 @@
       document.getElementById('fromLanguage').addEventListener('change', () => {
         updateSourceHighlight();
         document.getElementById('detectedLanguageDisplay').classList.add('hidden');
+        // Opening the preview automatically when the user picks HTML source.
+        if (document.getElementById('fromLanguage').value === 'html') {
+          document.getElementById('previewPanel').classList.remove('hidden');
+        }
+        updatePreview();
       });
       document.getElementById('toLanguage').addEventListener('change', updateOutputHighlight);
+    }
+
+    // Live HTML preview in a sandboxed iframe. Renders the SOURCE when it is HTML.
+    // ponytail: previews HTML source only. Executing the generated TypeScript
+    // (transpile via esbuild-wasm + run render()) is the next slice.
+    function togglePreview() {
+      const panel = document.getElementById('previewPanel');
+      panel.classList.toggle('hidden');
+      if (!panel.classList.contains('hidden')) updatePreview();
+    }
+
+    function updatePreview() {
+      const panel = document.getElementById('previewPanel');
+      if (panel.classList.contains('hidden')) return;
+      const frame = document.getElementById('previewFrame');
+      const hint = document.getElementById('previewHint');
+      const src = document.getElementById('sourceCode').value;
+      const lang = document.getElementById('fromLanguage').value;
+      const looksHtml = lang === 'html' || /<[a-z!][\s\S]*>/i.test(src);
+      if (looksHtml && src.trim()) {
+        frame.srcdoc = src;                 // sandbox="allow-scripts", null origin
+        frame.classList.remove('hidden');
+        hint.classList.add('hidden');
+      } else {
+        frame.srcdoc = '';
+        frame.classList.add('hidden');
+        hint.classList.remove('hidden');
+      }
     }
 
     // Auto-detect language function
