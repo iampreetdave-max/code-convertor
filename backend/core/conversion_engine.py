@@ -5,6 +5,7 @@ from converters.python_to_javascript import PythonToJavaScriptConverter
 from converters.javascript_to_python import JavaScriptToPythonConverter
 from converters.python_to_java import PythonToJavaConverter
 from converters.llm_converter import LLMConverter
+from core.conversion_cache import ConversionCache
 
 
 class ConversionEngine:
@@ -26,6 +27,7 @@ class ConversionEngine:
 
     def __init__(self):
         self.detector = LanguageDetector()
+        self.cache = ConversionCache()
         # Offline fallbacks for the pairs that have a rule-based converter.
         self.rule_based: Dict[tuple, type] = {
             ("python", "javascript"): PythonToJavaScriptConverter,
@@ -69,6 +71,14 @@ class ConversionEngine:
         # If none, rule-based is the normal path, not a degraded fallback.)
         llm_attempted = bool(LLMConverter._collect_keys())
 
+        # 0) Cache hit -> instant, and immune to rate limits. Only ever holds
+        #    output produced by a real successful conversion.
+        cached = self.cache.get(code, source, target)
+        if cached:
+            resp = ConvertResponse(**cached)
+            resp.metadata = {**(resp.metadata or {}), "cached": True}
+            return resp
+
         # 1) Try the LLM (idiomatic output for any pair).
         llm_result = None
         try:
@@ -83,6 +93,10 @@ class ConversionEngine:
 
         if llm_ok:
             result = llm_result
+            try:
+                self.cache.set(code, source, target, result.model_dump())
+            except Exception:
+                pass   # caching must never break a conversion
         elif rule_cls is not None:
             result = rule_cls().convert(code)
             result.metadata["method"] = "rule-based"

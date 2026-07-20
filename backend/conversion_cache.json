@@ -1,0 +1,22 @@
+{
+ "f0ac67e69f5283402847c5c5f2c43fdc3f684174253bedfb897bda5b6d33d3fb": {
+  "converted_code": "function greet(name) {\n    return \"Hello, \" + name;\n}",
+  "source_language": "python",
+  "target_language": "javascript",
+  "conversion_confidence": 0.95,
+  "warnings": [],
+  "unsupported_constructs": [],
+  "unsupported_lines_count": 0,
+  "conversion_level": 3,
+  "metadata": {
+   "method": "llm",
+   "model": "llama-3.3-70b-versatile",
+   "provider": "groq",
+   "source_lines": 2,
+   "target_lines": 3,
+   "syntax_validated": true,
+   "finish_reason": "stop",
+   "name_survival": 1.0
+  }
+ }
+}
