@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeTransform — Universal Code Converter</title>
+  <meta name="description" content="A powerful web-based code converter that transforms code between programming languages with high accuracy and confidence scoring." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="font-body" style="background-color:var(--bg); color:var(--text-primary);">
+
+  <!-- ============================ NAV ============================ -->
+  <header class="nav-glass sticky top-0 z-50">
+    <nav class="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3" aria-label="Primary">
+      <a href="#top" class="flex items-center gap-2.5" aria-label="CodeTransform home">
+        <span class="w-8 h-8 rounded-lg flex items-center justify-center btn-gradient">
+          <i data-lucide="code-2" class="w-4 h-4 text-white"></i>
+        </span>
+        <span class="font-display font-semibold text-base">CodeTransform</span>
+      </a>
+
+      <div class="hidden md:flex items-center gap-8 text-sm" style="color:var(--text-secondary);">
+        <a href="#features" class="hover:opacity-80 transition">Features</a>
+        <a href="#languages" class="hover:opacity-80 transition">Languages</a>
+        <a href="#faq" class="hover:opacity-80 transition">FAQ</a>
+        <a href="https://github.com/iampreetdave-max/code-convertor" target="_blank" rel="noopener" class="hover:opacity-80 transition">GitHub</a>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button id="themeToggle" type="button" aria-label="Toggle light and dark theme" class="p-2 rounded-lg transition" style="background:var(--bg-elevated); border:1px solid var(--border);">
+          <i data-lucide="sun" class="w-4 h-4"></i>
+        </button>
+        <a href="converter.html" class="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-white px-4 py-2 rounded-lg btn-gradient">
+          Start Converting
+        </a>
+        <button id="mobileNavToggle" aria-label="Open menu" aria-expanded="false" class="md:hidden p-2 rounded-lg" style="background:var(--bg-elevated); border:1px solid var(--border);">
+          <i data-lucide="menu" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </nav>
+    <div id="mobileNav" class="md:hidden overflow-hidden" style="max-height:0; opacity:0; border-top:1px solid var(--border-subtle);">
+      <div class="px-4 py-3 flex flex-col gap-3 text-sm" style="color:var(--text-secondary);">
+        <a href="#features">Features</a>
+        <a href="#languages">Languages</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/iampreetdave-max/code-convertor" target="_blank" rel="noopener">GitHub</a>
+        <a href="converter.html" class="inline-flex justify-center items-center text-white px-4 py-2 rounded-lg btn-gradient font-medium">Start Converting</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- ============================ HERO ============================ -->
+    <section class="relative overflow-hidden">
+      <div class="absolute inset-0 gradient-bg-soft pointer-events-none">
+        <div class="hero-orb absolute -top-24 -left-24 w-96 h-96 rounded-full" style="background:radial-gradient(circle, rgba(99,102,241,0.25), transparent 70%);"></div>
+        <div class="hero-orb-2 absolute top-40 -right-24 w-96 h-96 rounded-full" style="background:radial-gradient(circle, rgba(34,211,238,0.2), transparent 70%);"></div>
+      </div>
+
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 pt-16 pb-20 lg:pt-24 lg:pb-28 grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <span class="inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full mb-6" style="background:var(--bg-card); border:1px solid var(--border); color:var(--text-secondary);">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5" style="color:var(--accent-solid);"></i>
+            122+ tested conversion rules
+          </span>
+          <h1 class="font-display font-semibold text-4xl sm:text-5xl lg:text-6xl leading-[1.08] tracking-tight">
+            CodeTransform<br>
+            <span class="gradient-text">Universal Code Converter</span>
+          </h1>
+          <p class="mt-6 text-lg max-w-xl" style="color:var(--text-secondary);">
+            A powerful web-based code converter that transforms code between programming languages with high accuracy and confidence scoring.
+          </p>
+          <div class="mt-8 flex flex-wrap items-center gap-4">
+            <a href="converter.html" class="inline-flex items-center gap-2 text-white px-6 py-3.5 rounded-xl font-semibold btn-gradient">
+              Start Converting
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </a>
+            <a href="https://github.com/iampreetdave-max/code-convertor" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-semibold transition" style="border:1px solid var(--border); color:var(--text-primary);">
+              <i data-lucide="github" class="w-4 h-4"></i>
+              View GitHub
+            </a>
+          </div>
+          <div class="mt-10 flex items-center gap-6 text-sm" style="color:var(--text-tertiary);">
+            <span class="flex items-center gap-1.5"><i data-lucide="zap" class="w-4 h-4"></i>Fast</span>
+            <span class="flex items-center gap-1.5"><i data-lucide="target" class="w-4 h-4"></i>Accurate</span>
+            <span class="flex items-center gap-1.5"><i data-lucide="lock" class="w-4 h-4"></i>Privacy-first</span>
+          </div>
+        </div>
+
+        <!-- Signature: live code-morph demo -->
+        <div class="glass rounded-2xl p-1.5 shadow-2xl">
+          <div class="rounded-xl overflow-hidden" style="background:var(--bg-elevated);">
+            <div class="flex items-center gap-2 px-4 py-3" style="border-bottom:1px solid var(--border);">
+              <span class="browser-dot" style="background:#71717a;"></span>
+              <span class="browser-dot" style="background:#71717a;"></span>
+              <span class="browser-dot" style="background:#71717a;"></span>
+              <span class="ml-3 text-xs font-mono" style="color:var(--text-tertiary);">converter — python.py ⇄ script.js</span>
+            </div>
+            <pre class="morph-panel p-5 m-0" id="morphCode" style="color:var(--text-primary);" aria-hidden="true"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ FEATURES ============================ -->
+    <section id="features" class="max-w-7xl mx-auto px-4 sm:px-6 py-20 lg:py-28">
+      <div class="max-w-2xl mb-14 reveal">
+        <span class="text-xs font-semibold uppercase tracking-wider" style="color:var(--accent-solid);">Features</span>
+        <h2 class="font-display font-semibold text-3xl sm:text-4xl mt-3">Everything you need to move code between languages</h2>
+      </div>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div class="feature-card reveal rounded-2xl p-6">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 btn-gradient"><i data-lucide="repeat" class="w-5 h-5 text-white"></i></div>
+          <h3 class="font-semibold text-lg mb-2">Bidirectional Conversion</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">Convert Python to JavaScript and back, backed by 122+ tested conversion rules.</p>
+        </div>
+        <div class="feature-card reveal rounded-2xl p-6">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 btn-gradient"><i data-lucide="scan-search" class="w-5 h-5 text-white"></i></div>
+          <h3 class="font-semibold text-lg mb-2">Smart Language Detection</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">Auto-detects the source language straight from your code's own patterns.</p>
+        </div>
+        <div class="feature-card reveal rounded-2xl p-6">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 btn-gradient"><i data-lucide="upload-cloud" class="w-5 h-5 text-white"></i></div>
+          <h3 class="font-semibold text-lg mb-2">File Upload</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">Drag & drop or click to upload — the language is picked up from the file extension.</p>
+        </div>
+        <div class="feature-card reveal rounded-2xl p-6">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 btn-gradient"><i data-lucide="gauge" class="w-5 h-5 text-white"></i></div>
+          <h3 class="font-semibold text-lg mb-2">Confidence Scoring</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">A color-coded accuracy indicator shows how much you should trust each conversion.</p>
+        </div>
+        <div class="feature-card reveal rounded-2xl p-6">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 btn-gradient"><i data-lucide="history" class="w-5 h-5 text-white"></i></div>
+          <h3 class="font-semibold text-lg mb-2">Conversion History</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">Recent conversions are kept locally so you can revisit or reload them anytime.</p>
+        </div>
+        <div class="feature-card reveal rounded-2xl p-6">
+          <div class="w-11 h-11 rounded-xl flex items-center justify-center mb-4 btn-gradient"><i data-lucide="download" class="w-5 h-5 text-white"></i></div>
+          <h3 class="font-semibold text-lg mb-2">Download & Copy</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">One-click download with the right file extension, or copy straight to your clipboard.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ HOW IT WORKS ============================ -->
+    <section class="py-20 lg:py-28" style="background:var(--bg-surface); border-top:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle);">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="max-w-2xl mb-16 reveal">
+          <span class="text-xs font-semibold uppercase tracking-wider" style="color:var(--accent-solid);">How it works</span>
+          <h2 class="font-display font-semibold text-3xl sm:text-4xl mt-3">Three steps, start to converted code</h2>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-8 relative">
+          <div class="reveal text-center md:text-left">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 mx-auto md:mx-0 btn-gradient">
+              <i data-lucide="file-input" class="w-6 h-6 text-white"></i>
+            </div>
+            <h3 class="font-semibold text-lg mb-2">Upload or paste code</h3>
+            <p class="text-sm" style="color:var(--text-secondary);">Drop a file in, or paste your source directly into the editor.</p>
+          </div>
+          <div class="reveal text-center md:text-left">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 mx-auto md:mx-0 btn-gradient">
+              <i data-lucide="list-checks" class="w-6 h-6 text-white"></i>
+            </div>
+            <h3 class="font-semibold text-lg mb-2">Choose target language</h3>
+            <p class="text-sm" style="color:var(--text-secondary);">Source auto-detects; you just pick where the code should go.</p>
+          </div>
+          <div class="reveal text-center md:text-left">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 mx-auto md:mx-0 btn-gradient">
+              <i data-lucide="wand-sparkles" class="w-6 h-6 text-white"></i>
+            </div>
+            <h3 class="font-semibold text-lg mb-2">Instant conversion</h3>
+            <p class="text-sm" style="color:var(--text-secondary);">Get converted code with a confidence score, diff view, and warnings.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ LANGUAGES ============================ -->
+    <section id="languages" class="max-w-7xl mx-auto px-4 sm:px-6 py-20 lg:py-28">
+      <div class="max-w-2xl mb-14 reveal">
+        <span class="text-xs font-semibold uppercase tracking-wider" style="color:var(--accent-solid);">Languages</span>
+        <h2 class="font-display font-semibold text-3xl sm:text-4xl mt-3">Built for Python ⇄ JavaScript today</h2>
+        <p class="mt-4 text-sm" style="color:var(--text-secondary);">Python and JavaScript are fully supported in both directions. File-extension recognition covers the languages below for upload and download.</p>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <!-- Python -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#3776ab;">Py</span>
+          <div><p class="font-medium text-sm">Python</p><p class="text-xs" style="color:var(--accent-solid);">Full support</p></div>
+        </div>
+        <!-- JavaScript -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold" style="background:#f7df1e; color:#111;">JS</span>
+          <div><p class="font-medium text-sm">JavaScript</p><p class="text-xs" style="color:var(--accent-solid);">Full support</p></div>
+        </div>
+        <!-- Java -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#e76f00;">Jv</span>
+          <div><p class="font-medium text-sm">Java</p><p class="text-xs" style="color:var(--text-tertiary);">Detection</p></div>
+        </div>
+        <!-- TypeScript -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#3178c6;">Ts</span>
+          <div><p class="font-medium text-sm">TypeScript</p><p class="text-xs" style="color:var(--text-tertiary);">Detection</p></div>
+        </div>
+        <!-- C++ -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#00599c;">C++</span>
+          <div><p class="font-medium text-sm">C++</p><p class="text-xs" style="color:var(--text-tertiary);">Detection</p></div>
+        </div>
+        <!-- C -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#555;">C</span>
+          <div><p class="font-medium text-sm">C</p><p class="text-xs" style="color:var(--text-tertiary);">Detection</p></div>
+        </div>
+        <!-- C# -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#68217a;">C#</span>
+          <div><p class="font-medium text-sm">C#</p><p class="text-xs" style="color:var(--text-tertiary);">Detection</p></div>
+        </div>
+        <!-- Go -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#00add8;">Go</span>
+          <div><p class="font-medium text-sm">Go</p><p class="text-xs" style="color:var(--text-tertiary);">Detection</p></div>
+        </div>
+        <!-- Rust -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#dea584; color:#111;">Rs</span>
+          <div><p class="font-medium text-sm">Rust</p><p class="text-xs" style="color:var(--text-tertiary);">Detection</p></div>
+        </div>
+        <!-- PHP -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#777bb4;">Php</span>
+          <div><p class="font-medium text-sm">PHP</p><p class="text-xs" style="color:var(--text-tertiary);">Detection</p></div>
+        </div>
+        <!-- Ruby -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#cc342d;">Rb</span>
+          <div><p class="font-medium text-sm">Ruby</p><p class="text-xs" style="color:var(--text-tertiary);">Detection</p></div>
+        </div>
+        <!-- Swift -->
+        <div class="lang-card reveal rounded-xl p-4 flex items-center gap-3">
+          <span class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background:#f05138;">Sw</span>
+          <div><p class="font-medium text-sm">Swift</p><p class="text-xs" style="color:var(--text-tertiary);">Roadmap</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ SCREENSHOTS / DEMO ============================ -->
+    <section class="py-20 lg:py-28" style="background:var(--bg-surface); border-top:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle);">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="max-w-2xl mb-14 reveal">
+          <span class="text-xs font-semibold uppercase tracking-wider" style="color:var(--accent-solid);">See it in action</span>
+          <h2 class="font-display font-semibold text-3xl sm:text-4xl mt-3">A side-by-side view built for review, not guesswork</h2>
+        </div>
+
+        <div class="browser-frame reveal max-w-5xl mx-auto">
+          <div class="browser-frame-bar flex items-center gap-2 px-4 py-3">
+            <span class="browser-dot" style="background:#71717a;"></span>
+            <span class="browser-dot" style="background:#71717a;"></span>
+            <span class="browser-dot" style="background:#71717a;"></span>
+            <span class="ml-3 text-xs font-mono" style="color:var(--text-tertiary);">codetransform.app/converter</span>
+          </div>
+          <div class="grid md:grid-cols-2 gap-px" style="background:var(--border);">
+            <div class="p-5" style="background:var(--bg-elevated);">
+              <p class="text-xs uppercase tracking-wide mb-3" style="color:var(--text-tertiary);">Source · Python</p>
+              <pre class="font-mono text-xs leading-relaxed" style="color:var(--text-secondary);">def total(items):
+    return sum(
+        i.price for i in items
+    )</pre>
+            </div>
+            <div class="p-5" style="background:var(--bg-elevated);">
+              <p class="text-xs uppercase tracking-wide mb-3" style="color:var(--text-tertiary);">Converted · JavaScript</p>
+              <pre class="font-mono text-xs leading-relaxed" style="color:var(--text-secondary);">function total(items) {
+  return items.reduce(
+    (sum, i) => sum + i.price, 0
+  );
+}</pre>
+            </div>
+          </div>
+          <div class="px-5 py-4 flex items-center justify-between" style="border-top:1px solid var(--border);">
+            <span class="text-xs" style="color:var(--text-tertiary);">Confidence score</span>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full" style="background:rgba(99,102,241,0.15); color:var(--accent-solid);">94% high confidence</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ WHY CHOOSE ============================ -->
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 py-20 lg:py-28">
+      <div class="max-w-2xl mb-14 reveal">
+        <span class="text-xs font-semibold uppercase tracking-wider" style="color:var(--accent-solid);">Why CodeTransform</span>
+        <h2 class="font-display font-semibold text-3xl sm:text-4xl mt-3">Built to be trustworthy, not just fast</h2>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="feature-card reveal rounded-2xl p-6 text-center">
+          <i data-lucide="zap" class="w-6 h-6 mx-auto mb-3" style="color:var(--accent-solid);"></i>
+          <h3 class="font-semibold mb-1">Fast</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">Rule-based conversion returns results in a fraction of a second.</p>
+        </div>
+        <div class="feature-card reveal rounded-2xl p-6 text-center">
+          <i data-lucide="target" class="w-6 h-6 mx-auto mb-3" style="color:var(--accent-solid);"></i>
+          <h3 class="font-semibold mb-1">Accurate</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">122+ conversion rules, plus AI validation on the result.</p>
+        </div>
+        <div class="feature-card reveal rounded-2xl p-6 text-center">
+          <i data-lucide="lock" class="w-6 h-6 mx-auto mb-3" style="color:var(--accent-solid);"></i>
+          <h3 class="font-semibold mb-1">Privacy-first</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">History stays in your browser — nothing is stored on a server.</p>
+        </div>
+        <div class="feature-card reveal rounded-2xl p-6 text-center">
+          <i data-lucide="mouse-pointer-click" class="w-6 h-6 mx-auto mb-3" style="color:var(--accent-solid);"></i>
+          <h3 class="font-semibold mb-1">Easy to use</h3>
+          <p class="text-sm" style="color:var(--text-secondary);">Paste, pick a language, convert. No setup, no build step.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ FAQ ============================ -->
+    <section id="faq" class="py-20 lg:py-28" style="background:var(--bg-surface); border-top:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle);">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6">
+        <div class="mb-12 reveal">
+          <span class="text-xs font-semibold uppercase tracking-wider" style="color:var(--accent-solid);">FAQ</span>
+          <h2 class="font-display font-semibold text-3xl sm:text-4xl mt-3">Common questions</h2>
+        </div>
+
+        <div class="reveal">
+          <div class="faq-item py-2">
+            <button class="faq-question w-full flex items-center justify-between py-4 text-left" aria-expanded="false">
+              <span class="font-medium">How accurate is the conversion?</span>
+              <i data-lucide="chevron-down" class="faq-chevron w-5 h-5 flex-shrink-0" style="color:var(--text-tertiary);"></i>
+            </button>
+            <div class="faq-answer">
+              <p class="pb-4 text-sm" style="color:var(--text-secondary);">Every conversion ships with a confidence score built from structure preservation, syntax validity, and completeness, so you always know how much manual review it needs.</p>
+            </div>
+          </div>
+          <div class="faq-item py-2">
+            <button class="faq-question w-full flex items-center justify-between py-4 text-left" aria-expanded="false">
+              <span class="font-medium">Which languages are supported?</span>
+              <i data-lucide="chevron-down" class="faq-chevron w-5 h-5 flex-shrink-0" style="color:var(--text-tertiary);"></i>
+            </button>
+            <div class="faq-answer">
+              <p class="pb-4 text-sm" style="color:var(--text-secondary);">Python and JavaScript are fully supported for two-way conversion today. Java, TypeScript, C++, C#, Go, Rust, Ruby, and PHP are recognized for upload, download, and language detection.</p>
+            </div>
+          </div>
+          <div class="faq-item py-2">
+            <button class="faq-question w-full flex items-center justify-between py-4 text-left" aria-expanded="false">
+              <span class="font-medium">Is my code stored anywhere?</span>
+              <i data-lucide="chevron-down" class="faq-chevron w-5 h-5 flex-shrink-0" style="color:var(--text-tertiary);"></i>
+            </button>
+            <div class="faq-answer">
+              <p class="pb-4 text-sm" style="color:var(--text-secondary);">Your code is sent to the converter API to be processed, but conversion history is kept locally in your browser, not on a server.</p>
+            </div>
+          </div>
+          <div class="faq-item py-2">
+            <button class="faq-question w-full flex items-center justify-between py-4 text-left" aria-expanded="false">
+              <span class="font-medium">Does it support file upload?</span>
+              <i data-lucide="chevron-down" class="faq-chevron w-5 h-5 flex-shrink-0" style="color:var(--text-tertiary);"></i>
+            </button>
+            <div class="faq-answer">
+              <p class="pb-4 text-sm" style="color:var(--text-secondary);">Yes — drag and drop a file or click to upload, and the source language is picked up automatically from the file extension.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ CTA ============================ -->
+    <section class="max-w-5xl mx-auto px-4 sm:px-6 py-20 lg:py-28 text-center">
+      <h2 class="font-display font-semibold text-3xl sm:text-4xl reveal">Ready to convert your first file?</h2>
+      <p class="mt-4 max-w-xl mx-auto reveal" style="color:var(--text-secondary);">No sign-up, no build tools — open the converter and paste your code.</p>
+      <a href="converter.html" class="reveal mt-8 inline-flex items-center gap-2 text-white px-7 py-3.5 rounded-xl font-semibold btn-gradient">
+        Start Converting
+        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </a>
+    </section>
+  </main>
+
+  <!-- ============================ FOOTER ============================ -->
+  <footer style="border-top:1px solid var(--border-subtle);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+      <div class="flex items-center gap-2.5">
+        <span class="w-7 h-7 rounded-lg flex items-center justify-center btn-gradient">
+          <i data-lucide="code-2" class="w-3.5 h-3.5 text-white"></i>
+        </span>
+        <span class="font-display font-semibold text-sm">CodeTransform</span>
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-6 text-sm" style="color:var(--text-tertiary);">
+        <a href="https://github.com/iampreetdave-max/code-convertor" target="_blank" rel="noopener" class="hover:opacity-80 transition">GitHub</a>
+        <a href="https://github.com/iampreetdave-max/code-convertor/blob/main/README.md" target="_blank" rel="noopener" class="hover:opacity-80 transition">License</a>
+        <a href="#top" class="hover:opacity-80 transition">About</a>
+        <a href="https://github.com/iampreetdave-max/code-convertor/issues" target="_blank" rel="noopener" class="hover:opacity-80 transition">Contact</a>
+      </div>
+      <p class="text-xs" style="color:var(--text-tertiary);">© 2026 CodeTransform. MIT License.</p>
+    </div>
+  </footer>
+
+  <script src="js/landing.js"></script>
+</body>
+</html>

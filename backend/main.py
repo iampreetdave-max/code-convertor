@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from api.models import (
     DetectRequest, DetectResponse,
     ConvertRequest, ConvertResponse,
@@ -288,15 +289,11 @@ async def decompile(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Decompilation error: {str(e)}")
 
 
-# Serve the self-contained frontend at "/" ONLY.
-# ponytail: index.html has no local asset deps (CDN + API fetches only), so we
-# serve that single file instead of mounting the project root. The previous
-# `app.mount("/", StaticFiles(directory=".."))` exposed .env, .git/, and all
-# backend source over HTTP (GET /.env leaked the API key).
-INDEX_HTML_PATH = os.path.join(os.path.dirname(__file__), "..", "index.html")
+# Serve the frontend from public/ ONLY (landing page, converter, css, js).
+# Mounting `..` previously exposed .env / .git / all backend source over HTTP
+# (GET /.env leaked the API key). public/ holds nothing but frontend assets, so
+# mounting it is safe and serves the landing page + its css/js.
+PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "public")
 
-
-@app.get("/", include_in_schema=False)
-def serve_frontend():
-    """Serve the frontend single-page app."""
-    return FileResponse(INDEX_HTML_PATH, media_type="text/html")
+# Mounted LAST so it never shadows the API routes above.
+app.mount("/", StaticFiles(directory=PUBLIC_DIR, html=True), name="frontend")

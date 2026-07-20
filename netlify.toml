@@ -6,7 +6,7 @@
 # Optional: GROQ_MODEL (defaults to llama-3.3-70b-versatile)
 
 [build]
-  publish = "."
+  publish = "public"
   functions = "netlify/functions"
 
 [build.environment]

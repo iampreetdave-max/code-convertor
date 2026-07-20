@@ -420,7 +420,7 @@
           </svg>
           Convert Code
         </button>
-        <button id="previewToggleBtn" onclick="togglePreview()" class="flex items-center gap-2 bg-neutral-800 text-neutral-200 hover:bg-neutral-700 px-5 py-3 rounded-lg font-semibold transition" title="Toggle live HTML preview">
+        <button id="previewToggleBtn" onclick="togglePreview()" class="hidden flex items-center gap-2 bg-neutral-800 text-neutral-200 hover:bg-neutral-700 px-5 py-3 rounded-lg font-semibold transition" title="Toggle live HTML preview">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -727,6 +727,7 @@
       setupLanguageBadges();
       setupSyntaxHighlighting();
       loadSupportedPairs();
+      syncPreviewAvailability();
     });
 
     // Auto-detection debounce
@@ -742,7 +743,7 @@
       // Update highlighting on input and trigger auto-detection
       sourceCode.addEventListener('input', () => {
         updateSourceHighlight();
-        updatePreview();
+        syncPreviewAvailability();
 
         // Auto-detect language with debouncing
         clearTimeout(detectionTimeout);
@@ -774,7 +775,7 @@
         if (document.getElementById('fromLanguage').value === 'html') {
           document.getElementById('previewPanel').classList.remove('hidden');
         }
-        updatePreview();
+        syncPreviewAvailability();
       });
       document.getElementById('toLanguage').addEventListener('change', updateOutputHighlight);
     }
@@ -788,16 +789,36 @@
       if (!panel.classList.contains('hidden')) updatePreview();
     }
 
+    // Is the current source HTML? (explicit selection, or it clearly looks like markup)
+    function sourceIsHtml() {
+      const lang = document.getElementById('fromLanguage').value;
+      const src = document.getElementById('sourceCode').value || '';
+      if (lang) return lang === 'html';
+      return /<\s*(!doctype|html|head|body|div|span|p|a|h[1-6]|section|button|form|table|ul|li|img|style)\b/i.test(src);
+    }
+
+    // Show the Preview button ONLY for HTML; hide the panel otherwise.
+    function syncPreviewAvailability() {
+      const isHtml = sourceIsHtml();
+      const btn = document.getElementById('previewToggleBtn');
+      const panel = document.getElementById('previewPanel');
+      if (btn) btn.classList.toggle('hidden', !isHtml);
+      if (!isHtml && panel) panel.classList.add('hidden');
+      if (isHtml) updatePreview();
+    }
+
     function updatePreview() {
       const panel = document.getElementById('previewPanel');
-      if (panel.classList.contains('hidden')) return;
+      if (!panel || panel.classList.contains('hidden')) return;
       const frame = document.getElementById('previewFrame');
       const hint = document.getElementById('previewHint');
-      const src = document.getElementById('sourceCode').value;
-      const lang = document.getElementById('fromLanguage').value;
-      const looksHtml = lang === 'html' || /<[a-z!][\s\S]*>/i.test(src);
-      if (looksHtml && src.trim()) {
-        frame.srcdoc = src;                 // sandbox="allow-scripts", null origin
+      const src = (document.getElementById('sourceCode').value || '').trim();
+      if (src) {
+        // Full documents render as-is; fragments get a minimal shell so they
+        // render predictably instead of showing a blank frame.
+        frame.srcdoc = /<\s*html[\s>]/i.test(src)
+          ? src
+          : '<!doctype html><html><head><meta charset="utf-8"></head><body>' + src + '</body></html>';
         frame.classList.remove('hidden');
         hint.classList.add('hidden');
       } else {
@@ -906,7 +927,7 @@
 
       // Set text and highlight
       codeEl.textContent = code || ' ';
-      Prism.highlightElement(codeEl);
+      if (window.Prism) Prism.highlightElement(codeEl);  // CDN may be blocked
     }
 
     function updateOutputHighlight() {
@@ -920,7 +941,7 @@
 
       // Set text and highlight
       codeEl.textContent = code || ' ';
-      Prism.highlightElement(codeEl);
+      if (window.Prism) Prism.highlightElement(codeEl);  // CDN may be blocked
     }
 
     // Diff view functions
@@ -1223,25 +1244,29 @@
         data._conversionTime = conversionTime;
         lastConversionData = data;
 
+        // The converted output is the only critical part.
         document.getElementById("outputCode").value = data.converted_code || "";
-        updateOutputLineCount();
-        updateTargetBadge();
-        updateOutputHighlight();
 
-        // Update stats
-        stats.conversions++;
-        stats.totalTime += parseFloat(conversionTime);
-        if (data.conversion_confidence >= 0.6) stats.successes++;
-        localStorage.setItem('codeTransformStats', JSON.stringify(stats));
-        updateStats();
+        // Everything below is presentation/bookkeeping. A failure here (a blocked
+        // CDN lib, full localStorage, ...) must NEVER make a SUCCESSFUL conversion
+        // report as failed. Log it and carry on.
+        try {
+          updateOutputLineCount();
+          updateTargetBadge();
+          updateOutputHighlight();
 
-        // Add to history
-        addToHistory(code, data.converted_code, source, target, data.conversion_confidence);
+          stats.conversions++;
+          stats.totalTime += parseFloat(conversionTime);
+          if (data.conversion_confidence >= 0.6) stats.successes++;
+          localStorage.setItem('codeTransformStats', JSON.stringify(stats));
+          updateStats();
 
-        // Render report/diff DEFENSIVELY - a rendering error (e.g. a CDN lib
-        // that failed to load) must NOT make a successful conversion look failed.
-        try { renderConversionReport(data, source, target); } catch (e) { console.error("report render failed:", e); }
-        try { renderDiffView(code, data.converted_code); } catch (e) { console.error("diff render failed:", e); }
+          addToHistory(code, data.converted_code, source, target, data.conversion_confidence);
+          renderConversionReport(data, source, target);
+          renderDiffView(code, data.converted_code);
+        } catch (e) {
+          console.error("post-conversion UI error (the conversion itself succeeded):", e);
+        }
 
         // Never leave a silent blank box — surface the reason (e.g. AI rate-limited).
         if (!data.converted_code || !data.converted_code.trim()) {

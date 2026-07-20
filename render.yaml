@@ -10,21 +10,17 @@
 services:
   - type: web
     name: code-convertor-backend
-    runtime: python
+    runtime: docker
     plan: free
     branch: main
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    # $PORT is provided by Render; the app MUST bind to it (not a fixed port).
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /api/health
     # Deploys are driven by the GitHub Action (.github/workflows/deploy.yml).
     # If you'd rather use Render's native auto-deploy, set this to true and
     # delete/disable the GitHub Action to avoid double deploys.
-    autoDeploy: false
+    autoDeploy: true
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.12.10"
       - key: CODECONV_COMPILE_CHECK
         value: "1"           # tree-sitter validation runs; node/javac degrade gracefully if absent
       # Secrets — set the real values in the Render dashboard, never in this file:
