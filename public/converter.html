@@ -91,8 +91,9 @@
     .code-editor-container pre {
       margin: 0;
       padding: 1rem;
-      height: 100%;
-      overflow: auto;
+      height: auto;
+      min-height: 100%;
+      overflow: visible;   /* the .highlight-layer is the ONLY scroller */
       background: transparent !important;
       white-space: pre-wrap;
       word-wrap: break-word;
@@ -140,7 +141,7 @@
       height: 100%;
       pointer-events: none;
       z-index: 1;
-      overflow: auto;
+      overflow: hidden;   /* scrolled programmatically to match the textarea */
     }
     /* Override Prism theme for dark background */
     .code-editor-container code[class*="language-"],
@@ -420,7 +421,7 @@
           </svg>
           Convert Code
         </button>
-        <button id="previewToggleBtn" onclick="togglePreview()" class="hidden flex items-center gap-2 bg-neutral-800 text-neutral-200 hover:bg-neutral-700 px-5 py-3 rounded-lg font-semibold transition" title="Toggle live HTML preview">
+        <button id="previewToggleBtn" onclick="togglePreview()" style="display:none" class="flex items-center gap-2 bg-neutral-800 text-neutral-200 hover:bg-neutral-700 px-5 py-3 rounded-lg font-semibold transition" title="Toggle live HTML preview">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -790,6 +791,15 @@
     }
 
     // Is the current source HTML? (explicit selection, or it clearly looks like markup)
+    // Setting the <select> in code does NOT fire 'change', so every UI bit that
+    // depends on the source language (preview button, target list, badge,
+    // highlighting) went stale. Route ALL programmatic changes through here.
+    function setSourceLang(value) {
+      const el = document.getElementById('fromLanguage');
+      el.value = value;
+      el.dispatchEvent(new Event('change'));
+    }
+
     function sourceIsHtml() {
       const lang = document.getElementById('fromLanguage').value;
       const src = document.getElementById('sourceCode').value || '';
@@ -802,7 +812,7 @@
       const isHtml = sourceIsHtml();
       const btn = document.getElementById('previewToggleBtn');
       const panel = document.getElementById('previewPanel');
-      if (btn) btn.classList.toggle('hidden', !isHtml);
+      if (btn) btn.style.display = isHtml ? 'flex' : 'none';
       if (!isHtml && panel) panel.classList.add('hidden');
       if (isHtml) updatePreview();
     }
@@ -1093,7 +1103,7 @@
       reader.onload = (e) => {
         document.getElementById('sourceCode').value = e.target.result;
         if (language) {
-          document.getElementById('fromLanguage').value = language;
+          setSourceLang(language);
           updateSourceBadge();
           showToast(`Detected ${languageNames[language] || language} from file extension`);
         }
@@ -1118,7 +1128,7 @@
         }
         const data = await res.json();
         document.getElementById('sourceCode').value = `// ${file.name} — JVM bytecode (decompiled with CFR)`;
-        document.getElementById('fromLanguage').value = 'java';
+        setSourceLang('java');
         updateSourceBadge(); updateSourceHighlight(); updateSourceLineCount();
         updateTargetOptions();
         document.getElementById('toLanguage').value = 'java';
@@ -1178,7 +1188,7 @@
 
         const data = await response.json();
         if (data.detected_language !== "unknown") {
-          document.getElementById("fromLanguage").value = data.detected_language;
+          setSourceLang(data.detected_language);
           updateSourceBadge();
           return data;
         }
@@ -1657,7 +1667,7 @@ ${outputCode}
 
     function clearSource() {
       document.getElementById('sourceCode').value = '';
-      document.getElementById('fromLanguage').value = '';
+      setSourceLang('');
       document.getElementById('sourceLanguageBadge').classList.add('hidden');
       updateSourceLineCount();
       updateSourceHighlight();
@@ -1778,7 +1788,7 @@ ${outputCode}
       if (item) {
         document.getElementById('sourceCode').value = item.source;
         document.getElementById('outputCode').value = item.converted;
-        document.getElementById('fromLanguage').value = item.fromLang;
+        setSourceLang(item.fromLang);
         document.getElementById('toLanguage').value = item.toLang;
         updateSourceLineCount();
         updateOutputLineCount();
