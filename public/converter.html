@@ -428,6 +428,13 @@
           </svg>
           Preview
         </button>
+        <div id="slowNotice" style="display:none" class="items-center gap-2 text-sm text-amber-300/90">
+          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+          <span id="slowNoticeText">Still working…</span>
+        </div>
         <div class="text-xs text-neutral-600">
           <kbd class="px-1.5 py-0.5 bg-neutral-800 rounded text-neutral-400">Ctrl</kbd>+<kbd class="px-1.5 py-0.5 bg-neutral-800 rounded text-neutral-400">Enter</kbd>
         </div>
@@ -812,6 +819,30 @@
     window.addEventListener('load', () => {
       setTimeout(() => { try { syncPreviewAvailability(); } catch (_) {} }, 300);
     });
+
+    // A normal conversion returns in ~1s. If we're still waiting after that, the
+    // AI is almost certainly rate-limited and we're retrying/failing over — show
+    // a spinner so the wait is explained instead of looking frozen. Fast
+    // conversions never see it.
+    let slowTimers = [];
+    function showSlowNotice(on, msg) {
+      const el = document.getElementById('slowNotice');
+      if (!el) return;
+      if (msg) document.getElementById('slowNoticeText').textContent = msg;
+      el.style.display = on ? 'flex' : 'none';
+    }
+    function startSlowWatch() {
+      stopSlowWatch();
+      slowTimers.push(setTimeout(
+        () => showSlowNotice(true, 'AI is busy (rate-limited) — retrying…'), 2500));
+      slowTimers.push(setTimeout(
+        () => showSlowNotice(true, 'Still retrying — large files hit the free-tier limit…'), 9000));
+    }
+    function stopSlowWatch() {
+      slowTimers.forEach(clearTimeout);
+      slowTimers = [];
+      showSlowNotice(false);
+    }
 
     function sourceIsHtml() {
       const lang = document.getElementById('fromLanguage').value;
@@ -1243,6 +1274,7 @@
       convertBtn.disabled = true;
 
       const startTime = performance.now();
+      startSlowWatch();
 
       try {
         const response = await convertRequest({
@@ -1306,6 +1338,7 @@
         console.error("Error converting code:", error);
         showToast("Error converting code. Check if backend is running.", "error");
       } finally {
+        stopSlowWatch();
         convertBtn.classList.remove('converting');
         convertBtn.disabled = false;
       }
