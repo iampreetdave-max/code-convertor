@@ -844,6 +844,32 @@
       if (targets.includes(keep)) to.value = keep;
     }
 
+    // Convert endpoint resolution: the local FastAPI backend if it's there,
+    // otherwise the Netlify serverless function (pure-static deploy).
+    // Whichever answers first is remembered for the rest of the session.
+    const CONVERT_ENDPOINTS = ["/convert", "/.netlify/functions/convert"];
+    let convertEndpoint = null;
+    async function convertRequest(payload) {
+      const opts = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      };
+      const candidates = convertEndpoint ? [convertEndpoint] : CONVERT_ENDPOINTS;
+      let lastErr = null;
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, opts);
+          if (res.status === 404) { lastErr = new Error(`404 ${url}`); continue; }
+          convertEndpoint = url;
+          return res;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr || new Error("No conversion endpoint available");
+    }
+
     // Auto-detect language function
     async function autoDetectLanguage() {
       const code = document.getElementById('sourceCode').value;
@@ -1175,14 +1201,10 @@
       const startTime = performance.now();
 
       try {
-        const response = await fetch("/convert", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code,
-            source_language: source,
-            target_language: target
-          })
+        const response = await convertRequest({
+          code,
+          source_language: source,
+          target_language: target
         });
 
         // Surface real backend errors (e.g. unsupported pair) instead of "undefined".

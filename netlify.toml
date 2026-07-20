@@ -1,0 +1,25 @@
+# Netlify: static frontend + one serverless function for conversions.
+# No backend service to host — the FastAPI app is optional (local dev only).
+#
+# REQUIRED after connecting the repo:
+#   Site settings -> Environment variables -> add  GROQ_API_KEY = <your groq key>
+# Optional: GROQ_MODEL (defaults to llama-3.3-70b-versatile)
+
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Don't publish server-side source as static assets.
+[[redirects]]
+  from = "/backend/*"
+  to = "/index.html"
+  status = 404
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

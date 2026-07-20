@@ -373,7 +373,13 @@ class LLMConverter:
         if not raw:
             return ""
         m = re.search(r"```[a-zA-Z]*\s*\n(.*?)```", raw, re.DOTALL)
-        return (m.group(1) if m else raw).strip()
+        if m:
+            return m.group(1).strip()
+        # One-sided / unclosed fence (model omitted the closer): strip what's there.
+        s = raw.strip()
+        s = re.sub(r"^```[a-zA-Z]*\s*\n?", "", s)
+        s = re.sub(r"\n?```\s*$", "", s)
+        return s.strip()
 
     @staticmethod
     def _strip_confidence_marker(code: str) -> str:
