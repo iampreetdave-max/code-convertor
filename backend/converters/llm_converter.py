@@ -253,6 +253,17 @@ class LLMConverter:
         """
         if self._completion_fn is not None:
             return self._completion_fn(system, user, max_tokens)
+
+        # Prefer Claude when configured: far higher limits than Groq's free tier.
+        # ANY failure silently falls through to the Groq key pool below, so the
+        # app never gets worse than it was.
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+        if anthropic_key:
+            try:
+                return self._call_anthropic(anthropic_key, system, user, max_tokens)
+            except Exception as e:
+                self._last_provider_error = e   # fall through to Groq
+
         keys = self._rotated_keys()
         if not keys:
             raise RuntimeError("No GROQ API key configured.")
@@ -283,6 +294,22 @@ class LLMConverter:
                 except Exception as e:
                     last_err = e
         raise last_err
+
+    ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
+
+    def _call_anthropic(self, key: str, system: str, user: str, max_tokens: int) -> str:
+        import anthropic
+        client = anthropic.Anthropic(api_key=key)
+        msg = client.messages.create(
+            model=self.ANTHROPIC_MODEL,
+            max_tokens=max(1024, min(max_tokens, 8192)),
+            temperature=0,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        self._last_finish_reason = getattr(msg, "stop_reason", None)
+        parts = [b.text for b in msg.content if getattr(b, "type", "") == "text"]
+        return "".join(parts)
 
     def _call_key(self, key: str, system: str, user: str, max_tokens: int,
                   model: Optional[str] = None) -> str:
