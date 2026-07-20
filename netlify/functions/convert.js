@@ -13,8 +13,9 @@ const LANG = {
   rust: "Rust", ruby: "Ruby", php: "PHP",
 };
 
-const SOURCES = ["python", "javascript", "typescript", "java", "html", "cpp", "csharp", "go", "rust", "ruby", "php"];
-const TARGETS = ["python", "javascript", "typescript", "java", "cpp", "csharp", "go", "rust", "ruby", "php"];
+// Only what we convert well. HTML is source-only.
+const SOURCES = ["python", "javascript", "typescript", "java", "html"];
+const TARGETS = ["python", "javascript", "typescript", "java"];
 
 function systemPrompt(source, target) {
   const s = LANG[source] || source;

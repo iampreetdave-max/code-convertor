@@ -121,6 +121,10 @@ Translate SEMANTICS faithfully - produce code a professional {t} developer would
 class LLMConverter:
     """Groq-backed LLM converter for a specific (source_lang, target_lang) pair."""
 
+    # Small, fast model with a much higher free-tier TPM allowance. Used only
+    # when the primary model is rate-limited (large files on the free tier).
+    FALLBACK_MODEL = os.environ.get("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+
     BASE_MAX_TOKENS = 4096
     LARGE_FILE_MAX_TOKENS = 16384
     EXTRA_LARGE_FILE_MAX_TOKENS = 32768
@@ -266,11 +270,24 @@ class LLMConverter:
                     raise                 # genuine error (bad request) -> surface it
             if pass_i == 0:
                 time.sleep(self._retry_wait(last_err, 0))
+
+        # Last resort: the big model is rate-limited (free-tier tokens-per-minute
+        # is the usual culprit on large files). Retry once on a small, fast model
+        # with a much higher TPM allowance — a slightly weaker conversion beats a
+        # blank box during a demo.
+        if self._is_transient(last_err) and self.model != self.FALLBACK_MODEL:
+            for key in keys:
+                try:
+                    return self._call_key(key, system, user, max_tokens,
+                                          model=self.FALLBACK_MODEL)
+                except Exception as e:
+                    last_err = e
         raise last_err
 
-    def _call_key(self, key: str, system: str, user: str, max_tokens: int) -> str:
+    def _call_key(self, key: str, system: str, user: str, max_tokens: int,
+                  model: Optional[str] = None) -> str:
         resp = self._client_for(key).chat.completions.create(
-            model=self.model,
+            model=model or self.model,
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": user}],
             temperature=0.1,

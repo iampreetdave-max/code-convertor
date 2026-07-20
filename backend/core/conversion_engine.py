@@ -18,10 +18,11 @@ class ConversionEngine:
     """
 
     # Languages offered as a source / target. HTML is source-only.
-    SOURCE_LANGUAGES = ["python", "javascript", "typescript", "java", "html",
-                        "cpp", "csharp", "go", "rust", "ruby", "php"]
-    TARGET_LANGUAGES = ["python", "javascript", "typescript", "java",
-                        "cpp", "csharp", "go", "rust", "ruby", "php"]
+    # ONLY languages we actually convert well (verified). Anything we can't do
+    # properly is deliberately NOT offered — an option that produces junk is
+    # worse than no option. HTML is source-only.
+    SOURCE_LANGUAGES = ["python", "javascript", "typescript", "java", "html"]
+    TARGET_LANGUAGES = ["python", "javascript", "typescript", "java"]
 
     def __init__(self):
         self.detector = LanguageDetector()

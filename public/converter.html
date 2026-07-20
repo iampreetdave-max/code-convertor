@@ -655,18 +655,18 @@
 
   <script>
     // File extension to language mapping
+    // Only extensions for languages we actually support (plus HTML, which was
+    // missing — uploading a .html file never set the language or the preview).
     const extensionToLanguage = {
       'py': 'python',
       'js': 'javascript',
+      'jsx': 'javascript',
+      'mjs': 'javascript',
       'ts': 'typescript',
+      'tsx': 'typescript',
       'java': 'java',
-      'cpp': 'cpp',
-      'c': 'cpp',
-      'cs': 'csharp',
-      'go': 'go',
-      'rs': 'rust',
-      'rb': 'ruby',
-      'php': 'php'
+      'html': 'html',
+      'htm': 'html'
     };
 
     // Prism language mapping
@@ -720,15 +720,22 @@
 
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
-      updateStats();
-      renderHistory();
-      setupDropZone();
-      setupLineCounters();
-      setupKeyboardShortcuts();
-      setupLanguageBadges();
-      setupSyntaxHighlighting();
-      loadSupportedPairs();
-      syncPreviewAvailability();
+      // Each step is isolated: one failing init (e.g. corrupt localStorage in
+      // renderHistory) must NOT abort the rest — that previously killed
+      // setupSyntaxHighlighting(), so the language 'change' listener was never
+      // attached and the Preview button/highlighting silently never worked.
+      const boot = (name, fn) => {
+        try { fn(); } catch (e) { console.error('init step failed:', name, e); }
+      };
+      boot('updateStats', updateStats);
+      boot('renderHistory', renderHistory);
+      boot('setupDropZone', setupDropZone);
+      boot('setupLineCounters', setupLineCounters);
+      boot('setupKeyboardShortcuts', setupKeyboardShortcuts);
+      boot('setupLanguageBadges', setupLanguageBadges);
+      boot('setupSyntaxHighlighting', setupSyntaxHighlighting);
+      boot('loadSupportedPairs', loadSupportedPairs);
+      boot('syncPreviewAvailability', syncPreviewAvailability);
     });
 
     // Auto-detection debounce
@@ -799,6 +806,12 @@
       el.value = value;
       el.dispatchEvent(new Event('change'));
     }
+
+    // Safety net: re-sync once the page has settled, in case an init step or a
+    // late async (loadSupportedPairs) left the controls stale.
+    window.addEventListener('load', () => {
+      setTimeout(() => { try { syncPreviewAvailability(); } catch (_) {} }, 300);
+    });
 
     function sourceIsHtml() {
       const lang = document.getElementById('fromLanguage').value;

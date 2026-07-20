@@ -266,7 +266,7 @@ class TestMultiKey:
         class RateLimitError(Exception):
             pass
 
-        def boom(*a):
+        def boom(*a, **kw):   # **kw: _call_key now takes an optional model=
             raise RateLimitError("429")
         monkeypatch.setattr(conv, "_call_key", boom)
         monkeypatch.setattr(conv, "_retry_wait", lambda e, a: 0)  # no real sleep

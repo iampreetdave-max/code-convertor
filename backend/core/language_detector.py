@@ -94,6 +94,18 @@ class LanguageDetector:
             except ImportError:
                 pass
 
+    @staticmethod
+    def _looks_like_html(code: str) -> bool:
+        """Strong, low-false-positive HTML signals."""
+        s = code.strip()
+        if re.search(r"<!doctype\s+html|<html[\s>]|</html>|</body>|</head>", s, re.I):
+            return True
+        # Several distinct closing tags = markup, not a string containing '<'.
+        tags = re.findall(
+            r"</\s*(div|span|p|a|h[1-6]|section|header|footer|nav|ul|ol|li|table|tr|td|"
+            r"form|button|label|style|script|title|main|article|aside)\s*>", s, re.I)
+        return len(tags) >= 3
+
     def detect(self, code: str) -> DetectResponse:
         """
         Detect language using Groq API (preferred) or regex fallback.
@@ -109,6 +121,17 @@ class LanguageDetector:
                 detected_language="unknown",
                 confidence=0.0,
                 reason="No code provided",
+                alternatives=[]
+            )
+
+        # HTML has no entry in the pattern table, so it used to be force-fit to
+        # whatever scored least-badly (usually Java). Markup is unmistakable —
+        # short-circuit on strong signals before any scoring or API call.
+        if self._looks_like_html(code):
+            return DetectResponse(
+                detected_language="html",
+                confidence=0.95,
+                reason="HTML markup detected (doctype/tags)",
                 alternatives=[]
             )
 
